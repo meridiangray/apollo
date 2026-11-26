@@ -16,7 +16,7 @@ import (
 // The fixed places of the owner's machine: the WSL venv's python and the manager on the shared drive.
 const (
 	defaultWSLPython = "/home/manager/.venvs/apollo/bin/python"
-	defaultManagerPy   = "/mnt/e/Documents/development/stable/apollo/apollo.py"
+	defaultManagerPy   = "/mnt/e/Documents/development/stable/apollo/py/apollo.py"
 	defaultDistro    = "Debian"
 	defaultPort      = 8787
 	defaultTimeout   = 30
@@ -41,8 +41,8 @@ func exists(p string) bool {
 	return err == nil
 }
 
-// Defaults for one OS. The manager is the apollo.py beside the bin/ folder the executable sits in, when there is one
-// (on Windows read through WSL: E:\x\apollo.py is /mnt/e/x/apollo.py); else the fixed path on the shared drive. On
+// Defaults for one OS. The manager is the py/apollo.py beside the bin/ folder the executable sits in, when there is one
+// (on Windows read through WSL: E:\x\py\apollo.py is /mnt/e/x/py/apollo.py); else the fixed path on the shared drive. On
 // Windows the python is the WSL venv's; on Linux too when it exists; else python3.
 func Defaults(goos, exeDir string, have func(string) bool) Config {
 	c := Config{Python: defaultWSLPython, Manager: defaultManagerPy, Distro: defaultDistro, Port: defaultPort,
@@ -62,8 +62,8 @@ func Defaults(goos, exeDir string, have func(string) bool) Config {
 	return c
 }
 
-// managerCandidates are the places to look for apollo.py near the executable, in order: beside it
-// (<exeDir>/apollo.py, where Apollo.exe sits), then one folder up (<exeDir>/../apollo.py, for bin/). Either kind
+// managerCandidates are the places to look for py/apollo.py near the executable, in order: beside it
+// (<exeDir>/py/apollo.py, where Apollo.exe sits), then one folder up (<exeDir>/../py/apollo.py, for bin/). Either kind
 // of separator.
 func managerCandidates(exeDir string) []string {
 	d := strings.TrimRight(exeDir, `\/`)
@@ -74,9 +74,9 @@ func managerCandidates(exeDir string) []string {
 	if strings.Contains(d, `\`) {
 		sep = `\`
 	}
-	out := []string{d + sep + "apollo.py"}
+	out := []string{d + sep + "py" + sep + "apollo.py"}
 	if i := strings.LastIndexAny(d, `\/`); i >= 0 {
-		out = append(out, d[:i+1]+"apollo.py")
+		out = append(out, d[:i+1]+"py"+sep+"apollo.py")
 	}
 	return out
 }

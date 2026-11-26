@@ -13,8 +13,8 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-HERE = Path(__file__).resolve().parent
-APOLLO = HERE / "apollo.py"
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
+APOLLO = Path(__file__).resolve().with_name("apollo.py")
 HCFG = "/home/manager/hcfg_apollo"
 MAX_ROWS = 40                     # list items one tab returns
 MAX_CHARS = 30000                 # characters one tab returns

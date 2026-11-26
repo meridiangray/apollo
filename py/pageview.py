@@ -28,7 +28,7 @@ CACHE_VERSION = 2                                      # the outlines kept in st
 
 
 def _state_dir() -> Path:
-    return Path(os.environ.get("APOLLO_STATE") or Path(__file__).resolve().parent / "state")
+    return Path(os.environ.get("APOLLO_STATE") or Path(__file__).resolve().parent.parent / "state")
 
 
 MIN_SHARE = 0.15                                       # a text source's share of redacted lines below this is noise, not redaction

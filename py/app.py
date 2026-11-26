@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """app.py: the Apollo window. Left, every run Apollo knows; right, the selected run (panel.py's tabs).
 
-    ~/.venvs/apollo/bin/python /mnt/e/Documents/development/stable/apollo/app.py
+    ~/.venvs/apollo/bin/python /mnt/e/Documents/development/stable/apollo/py/app.py
 
 Plain tkinter, refreshed twice a second from the runs' files and apollo/state/. Start… picks a page-flow config (.yaml)
 or a brief (.md) and starts it through apollo.py (Dry is ticked by default: no model calls); Stop signals the selected
@@ -15,8 +15,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import apollo  # noqa: E402
 import runfiles  # noqa: E402
 

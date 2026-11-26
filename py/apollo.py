@@ -53,8 +53,8 @@ from pathlib import Path
 
 import yaml
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import archives  # noqa: E402
 import runfiles  # noqa: E402
 import runview  # noqa: E402
@@ -428,7 +428,7 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
             client["mcpServers"]["hydra"].update({"command": str(WS_PYTHON), "args": ["-m", "hydra_mcp.server"]})
         mcp_path, prompt = run_folder / "mcp.json", run_folder / "prompt.md"
         m = model or SESSION_MODEL
-        head = [str(HERE / "drysession.py")] if dry else []
+        head = [str(Path(__file__).resolve().with_name("drysession.py"))] if dry else []
         exe = [sys.executable, *head] if dry else [claude_path()]
         subs = sub_agents(counts, m) if counts else {}
         tools_ = [*SESSION_TOOLS, "Agent"] if subs else SESSION_TOOLS    # the Agent tool only when the session may dispatch

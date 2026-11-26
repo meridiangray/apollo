@@ -24,7 +24,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 DRAFT_NAME = "Draft"
 DRAFT_PREFIX = "draft"
 PAGE = 200                                                   # records a collection shows before "Show more"

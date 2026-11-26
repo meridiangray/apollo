@@ -24,7 +24,7 @@ import threading
 import time
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 MODELS = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
 # hydra-mcp's core tools that read and never write (the archive, its sources and its schema)
 READ_TOOLS = ("guide", "details", "find_entities", "get_records", "explain_entity", "paths", "sources", "read_source",
@@ -211,7 +211,7 @@ def begin(req: dict, run_facts=None) -> dict:
     _write(jobs / f"{jid}.json", job)
     _append(session, {"who": "me", "text": r["messages"][-1]["text"], "model": MODELS[r["model"]], "context": r["context"]})
     out = open(jobs / f"{jid}.log", "ab")
-    p = subprocess.Popen([sys.executable, str(HERE / "apollo.py"), "chatrun", "--id", jid],
+    p = subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name("apollo.py")), "chatrun", "--id", jid],
                          stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, start_new_session=True,
                          env={**os.environ, "APOLLO_STATE": str(state_dir())})
     out.close()

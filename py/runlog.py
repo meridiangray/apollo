@@ -37,7 +37,7 @@ from pathlib import Path
 
 import runfiles
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 MAX_ROWS = 1000                                          # rows a query returns
 LOCK_WAIT = 20.0                                         # seconds a writer waits for another writer
 READ_WAIT = 4.0

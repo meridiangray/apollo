@@ -55,22 +55,22 @@ func TestDefaultsPerOS(t *testing.T) {
 	// the manager: beside the executable first, then one folder up (bin/); Linux as it is, Windows through WSL
 	only := func(want string) func(string) bool { return func(p string) bool { return p == want } }
 	all := func(string) bool { return true }
-	if l := Defaults("linux", "/srv/apollo/bin", only("/srv/apollo/apollo.py")); l.Manager != "/srv/apollo/apollo.py" {
+	if l := Defaults("linux", "/srv/apollo/bin", only("/srv/apollo/py/apollo.py")); l.Manager != "/srv/apollo/py/apollo.py" {
 		t.Fatalf("linux up: %s", l.Manager)
 	}
-	if l := Defaults("linux", "/srv/apollo/bin", all); l.Manager != "/srv/apollo/bin/apollo.py" {
+	if l := Defaults("linux", "/srv/apollo/bin", all); l.Manager != "/srv/apollo/bin/py/apollo.py" {
 		t.Fatalf("linux beside wins: %s", l.Manager)
 	}
-	if w := Defaults("windows", `E:\Documents\apollo`, only(`E:\Documents\apollo\apollo.py`)); w.Manager != "/mnt/e/Documents/apollo/apollo.py" {
+	if w := Defaults("windows", `E:\Documents\apollo`, only(`E:\Documents\apollo\py\apollo.py`)); w.Manager != "/mnt/e/Documents/apollo/py/apollo.py" {
 		t.Fatalf("windows beside: %s", w.Manager)
 	}
-	if w := Defaults("windows", `E:\Documents\apollo\bin`, only(`E:\Documents\apollo\apollo.py`)); w.Manager != "/mnt/e/Documents/apollo/apollo.py" {
+	if w := Defaults("windows", `E:\Documents\apollo\bin`, only(`E:\Documents\apollo\py\apollo.py`)); w.Manager != "/mnt/e/Documents/apollo/py/apollo.py" {
 		t.Fatalf("windows up: %s", w.Manager)
 	}
-	if w := Defaults("windows", `E:\Documents\apollo`, all); w.Manager != "/mnt/e/Documents/apollo/apollo.py" {
+	if w := Defaults("windows", `E:\Documents\apollo`, all); w.Manager != "/mnt/e/Documents/apollo/py/apollo.py" {
 		t.Fatalf("windows both: %s", w.Manager)
 	}
-	if got := managerCandidates(`E:\a\apollo\`); !reflect.DeepEqual(got, []string{`E:\a\apollo\apollo.py`, `E:\a\apollo.py`}) {
+	if got := managerCandidates(`E:\a\apollo\`); !reflect.DeepEqual(got, []string{`E:\a\apollo\py\apollo.py`, `E:\a\py\apollo.py`}) {
 		t.Fatalf("candidates: %v", got)
 	}
 	if managerCandidates("") != nil {

@@ -5,7 +5,7 @@
 /go/vendor/
 /go/icon/vendor/
 
-# builds: go/build.sh writes every binary into bin/ (bin/Apollo.exe is the one to run); nothing built lives elsewhere
+# builds: make writes every binary into bin/ (bin/Apollo.exe is the one to run); nothing built lives elsewhere
 /bin/
 /Apollo.exe
 *.exe

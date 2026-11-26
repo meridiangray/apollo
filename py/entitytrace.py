@@ -19,7 +19,7 @@ from pathlib import Path
 import archives
 import runlog
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 FOLD_SECONDS = 3
 HISTORY_STEPS = 400
 CATS = ("org", "kin", "post", "geo", "event", "hold", "id", "src", "rev")

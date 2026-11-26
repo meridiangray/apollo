@@ -32,7 +32,7 @@ from pathlib import Path
 
 import runfiles
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 MAX_PAGES = 20
 DEFAULT_MODEL = "claude-haiku-5-5"
 SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -324,7 +324,7 @@ def begin(source: str, pages: str, tier: str | None = None) -> dict:
     path = folder(source) / "job.json"
     _write(path, job)
     log = open(path.with_suffix(".log"), "ab")
-    p = subprocess.Popen([sys.executable, str(HERE / "apollo.py"), "proofreadrun", "--source", source, "--pages", pages] + (["--model", tier] if tier else []),
+    p = subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name("apollo.py")), "proofreadrun", "--source", source, "--pages", pages] + (["--model", tier] if tier else []),
                          stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                          env={**os.environ, "APOLLO_STATE": str(state_dir())})
     log.close()

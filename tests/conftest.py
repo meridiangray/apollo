@@ -9,7 +9,7 @@ import pytest
 
 HERE = Path(__file__).resolve().parent
 APOLLO = HERE.parent
-sys.path.insert(0, str(APOLLO))
+sys.path.insert(0, str(APOLLO / "py"))
 TESTING = Path(os.environ.get("APOLLO_TESTING") or APOLLO.parent / "hydra-mcp-testing")
 sys.path.insert(0, str(TESTING / "pageflow"))
 

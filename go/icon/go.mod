@@ -12,5 +12,5 @@ require (
 	golang.org/x/image v0.12.0 // indirect
 )
 
-// the icon's drawing lives in the app (../appicon); vendor/apollo/appicon is its copy (go/build.sh refreshes it)
+// the icon's drawing lives in the app (../appicon), read through this replace
 replace apollo v0.0.0 => ..

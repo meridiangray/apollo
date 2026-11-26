@@ -29,7 +29,7 @@ from pathlib import Path
 import runfiles
 import toolargs
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 TOOLS = ("ocr", "text", "check", "build")
 HOME = Path.home()
 OCR_PYTHON = HOME / ".venvs" / "ocr" / "bin" / "python"
@@ -237,7 +237,7 @@ def begin(tool: str, source: str | None = None, archive: str | None = None, page
            "source": source, "archive": spec["archive"], "pages_arg": pages or None, "lang": lang if tool == "ocr" else None, "args": a or None, "pid": None}
     path = job_file(key, tool)
     _save(path, rec)
-    cmd = [sys.executable, str(HERE / "apollo.py"), "toolrun", "--tool", tool, "--key", key, "--spec", json.dumps(spec)]
+    cmd = [sys.executable, str(Path(__file__).resolve().with_name("apollo.py")), "toolrun", "--tool", tool, "--key", key, "--spec", json.dumps(spec)]
     log = open(path.with_suffix(".log"), "ab")
     p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                          env={**os.environ, "APOLLO_STATE": str(state_dir())})

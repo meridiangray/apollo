@@ -36,7 +36,7 @@ import proofread
 import runfiles
 import toolargs
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 MAX_PAGES = 4
 TEXT_CHARS = 6000
 SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -399,7 +399,7 @@ def begin(source: str, model: str | None = None, args: dict | None = None) -> di
     path = folder() / f"{source}.job.json"
     _write(path, job)
     log = open(folder() / f"{source}.job.log", "ab")
-    p = subprocess.Popen([sys.executable, str(HERE / "apollo.py"), "cataloguerun", "--source", source, "--model", key, "--args", json.dumps(a)],
+    p = subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name("apollo.py")), "cataloguerun", "--source", source, "--model", key, "--args", json.dumps(a)],
                          stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                          env={**os.environ, "APOLLO_STATE": str(state_dir())})
     log.close()

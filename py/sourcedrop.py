@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 PAGEFLOW = Path(os.environ.get("PAGEFLOW_DIR") or HERE.parent / "hydra-mcp-testing" / "pageflow")
 HYDRA_SRC = HERE.parent / "hydra-git" / "src"
 PART_CHARS = 3500

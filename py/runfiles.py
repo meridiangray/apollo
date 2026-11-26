@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 TESTING = Path(os.environ.get("APOLLO_TESTING") or HERE.parent / "hydra-mcp-testing")   # the one setting: where hydra-mcp-testing is
 PAGEFLOW = TESTING / "pageflow"
 if str(PAGEFLOW) not in sys.path:
