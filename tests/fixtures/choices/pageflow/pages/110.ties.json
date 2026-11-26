@@ -1,0 +1,287 @@
+{
+ "page": 110,
+ "pairs": [
+  {
+   "pair": 1,
+   "a": "person-jonathan-jay-pollard",
+   "b": "person-wolf-blitzer",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 2,
+   "a": "person-jonathan-jay-pollard",
+   "b": "company-the-jerusalem-post",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 3,
+   "a": "person-jonathan-jay-pollard",
+   "b": "company-the-new-york-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 4,
+   "a": "person-jonathan-jay-pollard",
+   "b": "company-the-washington-post",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 5,
+   "a": "person-jonathan-jay-pollard",
+   "b": "company-london-sunday-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 6,
+   "a": "person-wolf-blitzer",
+   "b": "company-the-jerusalem-post",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 7,
+   "a": "person-wolf-blitzer",
+   "b": "company-the-new-york-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 8,
+   "a": "person-wolf-blitzer",
+   "b": "company-the-washington-post",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 9,
+   "a": "person-wolf-blitzer",
+   "b": "company-london-sunday-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 10,
+   "a": "company-the-jerusalem-post",
+   "b": "company-the-new-york-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 11,
+   "a": "company-the-jerusalem-post",
+   "b": "company-the-washington-post",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 12,
+   "a": "company-the-jerusalem-post",
+   "b": "company-london-sunday-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 13,
+   "a": "company-the-new-york-times",
+   "b": "company-the-washington-post",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 14,
+   "a": "company-the-new-york-times",
+   "b": "company-london-sunday-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 15,
+   "a": "company-the-washington-post",
+   "b": "company-london-sunday-times",
+   "sentence": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  }
+ ],
+ "answers": [
+  {
+   "pair": 1,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 2,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 3,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 4,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 5,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 6,
+   "tie": "Employment",
+   "direction": "a->b",
+   "role": "correspondent",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+  },
+  {
+   "pair": 7,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 8,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 9,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 10,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 11,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 12,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 13,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 14,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 15,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  }
+ ],
+ "records": [
+  {
+   "id": "p110-t6",
+   "schema": "Employment",
+   "properties": {
+    "employee": [
+     "person-wolf-blitzer"
+    ],
+    "employer": [
+     "company-the-jerusalem-post"
+    ],
+    "notes": [
+     "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87."
+    ],
+    "role": [
+     "correspondent"
+    ]
+   },
+   "_page": 110
+  }
+ ],
+ "rejected": [],
+ "how": "ok",
+ "problems": [],
+ "widened": false
+}

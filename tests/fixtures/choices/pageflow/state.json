@@ -1,0 +1,261 @@
+{
+ "ticks": [
+  {
+   "step": "P0",
+   "ok": true,
+   "result": "1 hydra imports and hydra-mcp answers: ok; 2 Haiku answers JSON: ok; 3 source readable: ok; 4 archive path: ok; 5 no lock, no foreign task: ok; 6 Linux paths: ok; 7 templates clean: ok"
+  },
+  {
+   "step": "P1",
+   "ok": true,
+   "result": "archive /mnt/e/Documents/development/stable/hydra-mcp-testing/archives/2026-11-22-haiku-pageflow-full/pollard-da; collections ['actors', 'bodies', 'events', 'material', 'places']; group all; task tsk-vwwa31xp84; card 15 schemas"
+  },
+  {
+   "step": "P2",
+   "ok": true,
+   "result": "pp. 20-126: {'todo': 66, 'empty': 40, 'redacted': 1}; floors 40 words, 60% redacted; table in triage.md"
+  },
+  {
+   "step": "P3",
+   "ok": true,
+   "result": "485 mentions on 66 pages; pages {'ok': 21, 'sonnet': 10, 'repaired': 33, 'escalated': 2}"
+  },
+  {
+   "step": "P4",
+   "ok": true,
+   "result": "168 entities saved and cited; 10 identity questions; 0 refused"
+  },
+  {
+   "step": "P5",
+   "ok": true,
+   "result": "250 records from 66 pages; pages {'ok': 30, 'repaired': 30, 'escalated': 3, 'sonnet': 3}"
+  },
+  {
+   "step": "P6",
+   "ok": true,
+   "result": "81 records from 66 pages; pages {'ok': 60, 'escalated': 3, 'sonnet': 1, 'repaired': 2}"
+  },
+  {
+   "step": "P7",
+   "ok": true,
+   "result": "flushes 16: B saved {'actors': 23, 'bodies': 85, 'places': 60} cited 168; flush saved {'actors': 17, 'events': 30} cited 47; B saved {'places': 1} cited 1; flush saved {'actors': 10, 'bodies': 3, 'events': 51} cited 64; B saved {'bodies': 2} cited 2; flush saved {'actors': 7, 'events': 57, 'material"
+  },
+  {
+   "step": "P8",
+   "ok": true,
+   "result": "2 island pass(es); islands left: ['National Security Council Staff', 'Director of Central Intelligence', 'Foreign Denial and Deception Analysis Committee', 'Hebrew Day School', 'American Hospital in Paris', 'Israeli Army', 'El Al', 'Surveillance Information Center (NOSIC)', 'CIA Station Chief in Sou"
+  },
+  {
+   "step": "P9",
+   "ok": true,
+   "result": "wiki_readiness 10 findings; samename 11; counts {'actors': 103, 'bodies': 101, 'events': 247, 'material': 3, 'places': 62}"
+  }
+ ],
+ "pages": {
+  "21": {
+   "status": "done",
+   "calls": 3,
+   "seconds": 39.4,
+   "triage": {
+    "words": 44,
+    "lines": 15,
+    "redacted_lines": 2,
+    "redacted_share": 0.133,
+    "why": ""
+   },
+   "A": "ok",
+   "fails": {
+    "A": [],
+    "C": [],
+    "T": []
+   },
+   "C": "repaired",
+   "T": "ok",
+   "records": 0,
+   "T-wide": "ok"
+  },
+  "22": {
+   "status": "done",
+   "calls": 6,
+   "seconds": 90.1,
+   "triage": {
+    "words": 158,
+    "lines": 25,
+    "redacted_lines": 3,
+    "redacted_share": 0.12,
+    "why": ""
+   },
+   "A": "sonnet",
+   "fails": {
+    "A": [],
+    "C": [],
+    "T": []
+   },
+   "C": "ok",
+   "T": "ok",
+   "records": 5,
+   "T-wide": "ok"
+  },
+  "24": {
+   "status": "done",
+   "calls": 6,
+   "seconds": 83.9,
+   "triage": {
+    "words": 236,
+    "lines": 31,
+    "redacted_lines": 2,
+    "redacted_share": 0.065,
+    "why": ""
+   },
+   "A": "repaired",
+   "fails": {
+    "A": [],
+    "C": [],
+    "T": []
+   },
+   "C": "repaired",
+   "T": "ok",
+   "records": 3,
+   "T-wide": "ok"
+  },
+  "26": {
+   "status": "escalated",
+   "calls": 11,
+   "seconds": 159.2,
+   "triage": {
+    "words": 254,
+    "lines": 35,
+    "redacted_lines": 2,
+    "redacted_share": 0.057,
+    "why": ""
+   },
+   "A": "repaired",
+   "fails": {
+    "A": [],
+    "C": [],
+    "T": []
+   },
+   "C": "repaired",
+   "T": "escalated",
+   "records": 1,
+   "T-wide": "ok"
+  }
+ },
+ "roster_items": [
+  {
+   "form": "Pollard",
+   "kind": "Person",
+   "page": 20,
+   "quote": "Among the cases to be addressed was that of Jonathan Jay Pollard, an employee of the Navy Field Operational Intelligence Office (NFOIO} and other components of naval intelligence from September 1979 until November 1985.",
+   "claimed": "person-jonathan-jay-pollard",
+   "verdict": {
+    "item": 1,
+    "verdict": "same",
+    "same_as": "person-jonathan-jay-pollard",
+    "reason": "Full name Jonathan Jay Pollard in the sentence"
+   }
+  },
+  {
+   "form": "FBI",
+   "kind": "PublicBody",
+   "page": 22,
+   "quote": "In addition to the extensw\u00b7 to\u00b7 oat-arrest debriefings he qave investiqators from the FBI, 1 and Naval Investigative Service, Pollard granted a detailed, -t a-record interview to journalist Wolf Blitzer, and submitted two Memoranda In Aid of Sentencing, totaling 107 paqes, to presiding Ch~ Aubrey E. Robinson, Jr . , of the US Distri c t Court.",
+   "claimed": null,
+   "verdict": {
+    "item": 7,
+    "verdict": "new",
+    "same_as": "",
+    "reason": "FBI is not among the candidates"
+   }
+  }
+ ],
+ "questions": [
+  {
+   "form": "NISC",
+   "kind": "PublicBody",
+   "page": 28,
+   "quote": "Top Secret clearance and SCI access suspended; Pollard reassiqned as researcb ship analyst, NISC-34, pending fitness for duty evaluation by one of four cleared psychiatrists identified to Pollard by Commanding Officer, NISC.",
+   "claimed": null,
+   "verdict": {
+    "item": 22,
+    "verdict": "question",
+    "same_as": "",
+    "reason": "NISC alone could be NISC-33 or NISC-34, or the Commanding Officer's unit"
+   },
+   "why": "NISC alone could be NISC-33 or NISC-34, or the Commanding Officer's unit"
+  }
+ ],
+ "places": [
+  {
+   "place": "Israel",
+   "id": "place-israel",
+   "type": "country",
+   "country": "il",
+   "via": "register",
+   "key": "iso3166:IL"
+  },
+  {
+   "place": "United States",
+   "id": "place-united-states",
+   "type": "country",
+   "country": "us",
+   "via": "osm",
+   "osm": "relation/148838",
+   "lat": 39.78373,
+   "lon": -100.445882,
+   "osm_name": "United States"
+  }
+ ],
+ "close": {
+  "wiki_readiness": {
+   "count": 1,
+   "findings": [
+    {
+     "code": "terms.undated",
+     "level": "warning",
+     "count": 34,
+     "what": "terms of office with no year",
+     "examples": [
+      "Hafiz al-Assad (Person): Position occupied Syrian President",
+      "Erit Erb (Person): Employer Israel's Embassy",
+      "Erit Erb (Person): Position occupied Van Ness Street, N.W.",
+      "Joseph (Yossi) Yagur (Person): Employer Israeli Consulate New York",
+      "Joseph (Yossi) Yagur (Person): Position occupied Counselor for Scientific Affairs"
+     ],
+     "do": "add startDate and endDate (or date) to these relationship records: YYYY, or c. YYYY, before YYYY, after YYYY when the source is vague"
+    }
+   ]
+  }
+ },
+ "archive": "/mnt/e/Documents/development/stable/hydra-mcp-testing/archives/2026-11-22-haiku-pageflow-full/pollard-da",
+ "preflight": [
+  {
+   "check": "1 check",
+   "ok": true
+  },
+  {
+   "check": "2 check",
+   "ok": true
+  },
+  {
+   "check": "3 check",
+   "ok": true
+  },
+  {
+   "check": "4 check",
+   "ok": true
+  },
+  {
+   "check": "5 check",
+   "ok": true
+  },
+  {
+   "check": "6 check",
+   "ok": true
+  },
+  {
+   "check": "7 check",
+   "ok": true
+  }
+ ]
+}

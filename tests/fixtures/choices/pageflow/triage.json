@@ -1,0 +1,47 @@
+[
+ {
+  "page": 1,
+  "status": "out-of-scope",
+  "why": "outside pp. 20-126",
+  "words": 39,
+  "lines": 26,
+  "redacted_lines": 6,
+  "redacted_share": 0.231
+ },
+ {
+  "page": 20,
+  "status": "todo",
+  "why": "",
+  "words": 207,
+  "lines": 31,
+  "redacted_lines": 2,
+  "redacted_share": 0.065
+ },
+ {
+  "page": 21,
+  "status": "todo",
+  "why": "",
+  "words": 44,
+  "lines": 15,
+  "redacted_lines": 2,
+  "redacted_share": 0.133
+ },
+ {
+  "page": 51,
+  "status": "empty",
+  "why": "22 words < 40",
+  "words": 22,
+  "lines": 6,
+  "redacted_lines": 0,
+  "redacted_share": 0.0
+ },
+ {
+  "page": 52,
+  "status": "todo",
+  "why": "",
+  "words": 83,
+  "lines": 13,
+  "redacted_lines": 0,
+  "redacted_share": 0.0
+ }
+]

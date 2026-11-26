@@ -1,0 +1,90 @@
+{
+ "recipes": [
+  {
+   "name": "full",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/recipes/full.yaml",
+   "description": "Every page of the source, the full budgets.",
+   "defaults": {
+    "model": "claude-haiku-5-5",
+    "span": null,
+    "budget_per_page": 8.41,
+    "lag": false
+   }
+  },
+  {
+   "name": "lag",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/recipes/lag.yaml",
+   "description": "The smoke run with the lag-check on.",
+   "defaults": {
+    "model": "claude-haiku-5-5",
+    "span": 11,
+    "budget_per_page": 7.27,
+    "lag": true
+   }
+  },
+  {
+   "name": "smoke",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/recipes/smoke.yaml",
+   "description": "The first 11 pages of the source, small budgets.",
+   "defaults": {
+    "model": "claude-haiku-5-5",
+    "span": 11,
+    "budget_per_page": 7.27,
+    "lag": false
+   }
+  }
+ ],
+ "sources": [
+  {
+   "name": "alwaleed",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/sources/alwaleed.yaml",
+   "title": "Al Waleed bin Talal Al Saud",
+   "publisher": "Wikipedia",
+   "file": "sources/al-waleed-bin-talal-al-saud.txt",
+   "pages": "1-9",
+   "reference": false
+  },
+  {
+   "name": "jeddah-tower",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/sources/jeddah-tower.yaml",
+   "title": "Jeddah Tower",
+   "publisher": "Wikipedia",
+   "file": "sources/jeddah-tower.txt",
+   "pages": "1-10",
+   "reference": false
+  },
+  {
+   "name": "pollard",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/sources/pollard.yaml",
+   "title": "The Jonathan Jay Pollard Espionage Case: A Damage Assessment",
+   "publisher": "Central Intelligence Agency",
+   "file": "sources/pollard-damage-assessment.pdf",
+   "pages": "20-126",
+   "reference": true
+  }
+ ],
+ "briefs": [
+  {
+   "name": "pollard-incident",
+   "kind": "mcp-session",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/briefs/pollard-incident.md",
+   "description": "The Pollard Damage Assessment, incident context",
+   "defaults": {
+    "model": "claude-sonnet-5-5",
+    "pages": null,
+    "budget": null
+   }
+  },
+  {
+   "name": "supervisor",
+   "kind": "mcp-session",
+   "path": "/mnt/e/Documents/development/stable/hydra-mcp-testing/briefs/supervisor.md",
+   "description": "The supervisor of a run",
+   "defaults": {
+    "model": "claude-sonnet-5-5",
+    "pages": null,
+    "budget": null
+   }
+  }
+ ]
+}

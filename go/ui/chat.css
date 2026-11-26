@@ -1,0 +1,78 @@
+/* chat.css — the chat bubble and its window (chat.js): Hydra's chat (hydra-git wiki/assets/minirail.css, the .ch-btn circle and
+   the .sg-chat window) without the mini rail. Theme variables only; the Model pill is app.css's .ch-enum (the Sources pill). */
+.ch-btn,.ch-win{--ch-shadow:var(--shadow),0 6px 18px -8px var(--ink)}
+
+/* the circle: fixed, placed by chat.js (left / top) */
+.ch-btn{position:fixed;left:auto;right:16px;bottom:30px;z-index:55;width:56px;height:56px;box-sizing:border-box;display:grid;place-items:center;padding:0;
+  border-radius:50%;cursor:pointer;touch-action:none;user-select:none;border:1px solid var(--line);background:var(--panel);color:var(--link);
+  box-shadow:var(--ch-shadow);transition:transform .15s,box-shadow .15s}
+.ch-btn.placed{right:auto;bottom:auto}
+.ch-btn svg{width:24px;height:24px}
+.ch-btn:hover{transform:scale(1.05)}
+.ch-btn.dragging{cursor:grabbing;transform:scale(1.08);transition:none}
+.ch-btn.on{box-shadow:0 0 0 3px var(--accent),var(--ch-shadow)}
+.ch-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* the window: placed by the circle (above it, else below, else beside), or where its header was dropped */
+.ch-win{position:fixed;left:0;top:0;z-index:56;box-sizing:border-box;width:min(22rem,calc(100vw - 2rem));height:min(28rem,calc(100dvh - 7rem));
+  margin:0;padding:.5rem .6rem .6rem;display:flex;flex-direction:column;overflow:hidden;font-size:.82rem;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:calc(var(--radius) * .7);box-shadow:var(--ch-shadow);
+  opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px);transition:transform .2s ease-out,opacity .16s,visibility 0s .2s}
+.ch-win.up{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition:transform .2s ease-out,opacity .16s,box-shadow .2s}
+.ch-win.up:hover{box-shadow:var(--ch-shadow),0 0 0 1px var(--accent)}
+.ch-win.ch-pull{transition:none}
+.ch-win .ch-grab{display:none}
+.ch-win .drawer{display:flex;flex-direction:column;gap:.5rem;flex:1 1 0;min-height:0;overflow:hidden}
+
+/* the header: the Chat tab, then the Model pill and Clear at the right; a drag moves the window, a double-click pairs it again */
+.ch-win .ch-head{flex:none;display:flex;align-items:center;gap:.4rem;padding:0 .1rem;cursor:grab;user-select:none;touch-action:none}
+.ch-win .ch-head:active{cursor:grabbing}
+.ch-win .ch-tab{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .15rem;border-bottom:2px solid var(--accent);font:600 .82rem/1 var(--sans);color:var(--ink)}
+.ch-win .ch-tab svg{color:var(--link)}
+.ch-win .ch-tools{margin-left:auto;display:flex;align-items:center;gap:.3rem;cursor:default}
+.ch-win .ch-clear{flex:none;width:1.7rem;height:1.7rem;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:calc(var(--radius) * .7);
+  background:var(--bg);color:var(--ink);cursor:pointer}
+.ch-win .ch-clear:hover{border-color:var(--accent);color:var(--accent)}
+
+/* the messages: filling the middle, gathered at its foot, kept at the newest unless scrolled up */
+.ch-win .ch-log{flex:1 1 0;min-height:4rem;list-style:none;margin:0;padding:0 .1rem;display:flex;flex-direction:column;gap:.35rem;overflow:auto;scrollbar-width:thin}
+.ch-win .ch-log>:first-child{margin-top:auto}
+.ch-win .ch-log li{max-width:85%;padding:.35rem .6rem;border-radius:calc(var(--radius) * .7);font:.84rem/1.45 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere}
+.ch-win .ch-log .ch-me{align-self:flex-end;background:color-mix(in srgb,var(--link) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--link) 30%,var(--line))}
+.ch-win .ch-log .ch-reply{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+.ch-win .ch-log .ch-err{color:var(--red);border-color:var(--red)}
+.ch-win .ch-wait{display:flex;gap:.28rem;align-items:center;padding:.6rem .7rem}
+.ch-win .ch-wait i{width:.42rem;height:.42rem;border-radius:50%;background:var(--ink);opacity:.3;animation:ch-dot 1.1s ease-in-out infinite}
+.ch-win .ch-wait i:nth-child(2){animation-delay:.16s}
+.ch-win .ch-wait i:nth-child(3){animation-delay:.32s}
+@keyframes ch-dot{0%,70%,100%{opacity:.25;transform:translateY(0)}35%{opacity:1;transform:translateY(-.2rem)}}
+
+/* the composer: one rounded box, the message on top, Send at the right of its foot */
+.ch-win .ch-compose{flex:none;padding-top:.5rem;border-top:1px solid var(--line)}
+.ch-win .ch-form{display:flex;flex-direction:column;gap:.25rem;margin:0;padding:.5rem .5rem .45rem;border:1px solid var(--line);border-radius:calc(var(--radius) * 1.1);
+  background:var(--bg);transition:border-color .15s}
+.ch-win .ch-form:focus-within{border-color:var(--accent)}
+.ch-win .ch-form textarea{width:100%;min-width:0;resize:none;box-sizing:border-box;min-height:1.9rem;max-height:7.5rem;padding:.2rem .3rem;border:0;background:none;
+  color:var(--ink);font:.86rem/1.4 var(--sans)}
+.ch-win .ch-form textarea:focus{outline:none}
+.ch-win .ch-bar{display:flex;align-items:center;gap:.35rem;min-width:0}
+.ch-win .ch-bar .grow{flex:1}
+.ch-win .ch-send{flex:none;width:1.95rem;height:1.95rem;display:grid;place-items:center;padding:0;border:0;border-radius:calc(var(--radius) * .7);
+  background:var(--accent);color:var(--bg);cursor:pointer}
+.ch-win .ch-send:hover{filter:brightness(1.08)}
+.ch-win .ch-send:disabled{cursor:default;filter:none;background:var(--line)}
+
+/* narrow screens: the circle keeps to the right edge, the window is a bottom sheet with a handle (a swipe down closes it) */
+@media(max-width:640px){
+  .ch-win.ch-sheet{left:0;right:0;top:auto;bottom:var(--ch-bot,0px);width:100%;height:auto;max-height:min(70vh,calc(var(--ch-vh,100vh) - 16px));
+    border-radius:16px 16px 0 0;border-width:1px 0 0;padding-bottom:calc(.6rem + env(safe-area-inset-bottom,0px));transform:translateY(100%)}
+  .ch-win.ch-sheet.up{transform:none}
+  .ch-win.ch-sheet .drawer{flex:0 1 auto}
+  .ch-win.ch-sheet .ch-log{flex:1 1 auto;min-height:8rem}
+  .ch-win .ch-grab{display:flex;justify-content:center;padding:.15rem 0 .5rem;margin:-.2rem 0 0;touch-action:none;cursor:grab}
+  .ch-win .ch-grab i{width:2.6rem;height:.28rem;border-radius:99px;background:var(--line)}
+  .ch-win .ch-head{cursor:default}
+  .ch-win .ch-form textarea{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){.ch-btn,.ch-win,.ch-win.up{transition:none}.ch-win .ch-wait i{animation:none;opacity:.6}}
+@media print{.ch-btn,.ch-win{display:none}}

@@ -1,0 +1,17 @@
+# Apollo: source in LF everywhere, so the shell scripts run in WSL after a Windows checkout; binaries never converted
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.go text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.syso binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.woff2 binary

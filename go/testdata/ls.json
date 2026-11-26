@@ -1,0 +1,207 @@
+[
+  {
+    "schema": 1,
+    "id": "2026-11-24-dry-smoke",
+    "name": "smoke",
+    "kind": "pageflow",
+    "model": "claude-haiku-5-5",
+    "status": "stopped",
+    "detail": "stopped-budget",
+    "alive": false,
+    "pid": 3301163,
+    "dry": true,
+    "fast": false,
+    "started": "2026-11-24T21:33:03",
+    "ended": "2026-11-24T21:37:41",
+    "elapsed_s": 278.0,
+    "exit_code": 2,
+    "run_folder": "/mnt/e/Documents/development/stable/apollo/dry/runs/2026-11-24-dry-smoke",
+    "archive": "/mnt/e/Documents/development/stable/apollo/dry/archives/2026-11-24-dry-smoke/pollard-da",
+    "config": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/runs/pollard-smoke.yaml",
+    "progress": {
+      "fraction": 0.9769,
+      "stage": "close",
+      "label": "Close and report",
+      "done": 3,
+      "total": 4,
+      "pages": {
+        "done": 5
+      },
+      "chunk": {
+        "at": 1,
+        "of": 1
+      },
+      "pages_read": 5,
+      "pages_content": 5
+    },
+    "calls": {
+      "hydra": 81,
+      "errors": 0,
+      "model": 42
+    },
+    "cost": {
+      "usd": 0.0,
+      "haiku": [
+        48,
+        80
+      ],
+      "sonnet": [
+        2,
+        6
+      ],
+      "turns": null,
+      "budget_usd": null
+    },
+    "last": "21:37:40  Ran run stopped-budget  Session",
+    "report": "/mnt/e/Documents/development/stable/apollo/dry/runs/2026-11-24-dry-smoke/report.md",
+    "copied": {},
+    "cells": [
+      [
+        20,
+        "done",
+        11
+      ],
+      [
+        21,
+        "done",
+        0
+      ],
+      [
+        22,
+        "done",
+        6
+      ],
+      [
+        23,
+        "done",
+        7
+      ],
+      [
+        24,
+        "done",
+        4
+      ]
+    ]
+  },
+  {
+    "schema": 1,
+    "id": "2026-11-24-dry-smoke-2",
+    "name": "smoke",
+    "kind": "pageflow",
+    "model": "claude-haiku-5-5",
+    "status": "done",
+    "detail": "done",
+    "alive": false,
+    "pid": 3303516,
+    "dry": true,
+    "fast": false,
+    "started": "2026-11-24T21:38:11",
+    "ended": "2026-11-24T21:42:46",
+    "elapsed_s": 275.0,
+    "exit_code": 0,
+    "run_folder": "/mnt/e/Documents/development/stable/apollo/dry/runs/2026-11-24-dry-smoke-2",
+    "archive": "/mnt/e/Documents/development/stable/apollo/dry/archives/2026-11-24-dry-smoke-2/pollard-da",
+    "config": "/mnt/e/Documents/development/stable/hydra-mcp-testing/pageflow/runs/pollard-smoke.yaml",
+    "progress": {
+      "fraction": 1.0,
+      "stage": "close",
+      "label": "Close and report",
+      "done": 3,
+      "total": 4,
+      "pages": {
+        "done": 3
+      },
+      "chunk": {
+        "at": 1,
+        "of": 1
+      },
+      "pages_read": 3,
+      "pages_content": 3
+    },
+    "calls": {
+      "hydra": 79,
+      "errors": 0,
+      "model": 26
+    },
+    "cost": {
+      "usd": 0.0,
+      "haiku": [
+        31,
+        80
+      ],
+      "sonnet": [
+        2,
+        6
+      ],
+      "turns": null,
+      "budget_usd": null
+    },
+    "last": "21:42:45  Ran run done  Session",
+    "report": "/mnt/e/Documents/development/stable/apollo/dry/runs/2026-11-24-dry-smoke-2/report.md",
+    "copied": {},
+    "cells": [
+      [
+        20,
+        "done",
+        11
+      ],
+      [
+        21,
+        "done",
+        0
+      ],
+      [
+        22,
+        "done",
+        6
+      ]
+    ]
+  },
+  {
+    "schema": 1,
+    "id": "2026-11-24-dry-rate",
+    "name": "rate",
+    "kind": "mcp-session",
+    "model": "claude-sonnet-5-5",
+    "status": "done",
+    "detail": "success",
+    "alive": false,
+    "pid": 3303673,
+    "dry": true,
+    "fast": false,
+    "started": "2026-11-24T21:38:22",
+    "ended": "2026-11-24T21:38:38",
+    "elapsed_s": 16.0,
+    "exit_code": 0,
+    "run_folder": "/mnt/e/Documents/development/stable/apollo/dry/runs/2026-11-24-dry-rate",
+    "archive": null,
+    "config": "/mnt/e/Documents/development/stable/hydra-mcp-testing/briefs/supervisor.md",
+    "progress": {
+      "fraction": 1.0,
+      "stage": null,
+      "label": null,
+      "done": null,
+      "total": null,
+      "pages": {},
+      "chunk": null,
+      "pages_read": 0,
+      "pages_content": 0
+    },
+    "calls": {
+      "hydra": 5,
+      "errors": 1,
+      "model": null
+    },
+    "cost": {
+      "usd": 0.0,
+      "haiku": null,
+      "sonnet": null,
+      "turns": 8,
+      "budget_usd": 2.0
+    },
+    "last": "21:51:18  Ran session done  Session",
+    "report": null,
+    "copied": {},
+    "cells": []
+  }
+]

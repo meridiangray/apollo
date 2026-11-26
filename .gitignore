@@ -1,0 +1,47 @@
+# Apollo. Source, go.mod/go.sum, the page libraries (go/ui/vendor) and the icon resource
+# (go/rsrc_windows_amd64.syso, redrawn only by go/icon) are tracked; everything below is made by building or running.
+
+# Go libraries are never committed: go.mod/go.sum pin them and the build downloads them
+/go/vendor/
+/go/icon/vendor/
+
+# builds: go/build.sh writes every binary into bin/ (bin/Apollo.exe is the one to run); nothing built lives elsewhere
+/bin/
+/Apollo.exe
+*.exe
+*.exe~
+*.exe.new
+*.test
+go/apollo
+go/apollo.exe
+
+# a machine's own settings (apollo.json beside the executable: ports, paths), never committed
+apollo.json
+/bin/apollo.json
+
+# runs: the manager's own state, and the dry runs' sessions and archive copies
+/state/
+/dry/
+
+# sources dropped into Apollo: the owner's own material and its profiles, never committed
+/sources/
+
+# the session's working archive (the draft each session starts with) and any others Apollo keeps
+/archives/
+
+# the chat's session logs and any local exports live under state/ and the runs' folders (above)
+
+# Python
+__pycache__/
+*.py[co]
+.pytest_cache/
+.venv/
+venv/
+
+# editors and the OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,24 @@
+{
+ "entity": "position-middle-eastern-warship-analyst",
+ "page": 114,
+ "how": "ok",
+ "problems": [],
+ "records": [
+  {
+   "id": "p114-iposition-middle-east0",
+   "schema": "Occupancy",
+   "properties": {
+    "holder": [
+     "person-jonathan-jay-pollard"
+    ],
+    "post": [
+     "position-middle-eastern-warship-analyst"
+    ],
+    "notes": [
+     "Assigned as Middle Eastern Warship Analyst in Free World Branch."
+    ]
+   },
+   "_page": 114
+  }
+ ]
+}

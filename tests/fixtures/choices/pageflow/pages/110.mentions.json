@@ -1,0 +1,106 @@
+{
+ "page": 110,
+ "how": "sonnet",
+ "problems": [],
+ "mentions": [
+  {
+   "name": "Wolf Blitzer",
+   "kind": "Person",
+   "as_written": [
+    "Wolf Blitzer"
+   ],
+   "said": "Jerusalem Post correspondent who wrote press articles on the Pollard case",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87.",
+   "place_type": "",
+   "country": ""
+  },
+  {
+   "name": "Pollard",
+   "kind": "Person",
+   "as_written": [
+    "Pollard"
+   ],
+   "said": "Subject of the press articles and the case under discussion",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87.",
+   "place_type": "",
+   "country": ""
+  },
+  {
+   "name": "The Jerusalem Post",
+   "kind": "Company",
+   "as_written": [
+    "Jerusalem Post",
+    "The Jerusalem Post"
+   ],
+   "said": "Newspaper that published press articles on the Pollard case, 1986-87",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87.",
+   "place_type": "",
+   "country": ""
+  },
+  {
+   "name": "London Sunday Times",
+   "kind": "Company",
+   "as_written": [
+    "London Sunday Times"
+   ],
+   "said": "Newspaper that published press articles on the Pollard case, 1986-87",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87.",
+   "place_type": "",
+   "country": ""
+  },
+  {
+   "name": "The New York Times",
+   "kind": "Company",
+   "as_written": [
+    "The New York Times"
+   ],
+   "said": "Newspaper that published press articles on the Pollard case, 1986-87",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87.",
+   "place_type": "",
+   "country": ""
+  },
+  {
+   "name": "The Washington Post",
+   "kind": "Company",
+   "as_written": [
+    "The Washington Post"
+   ],
+   "said": "Newspaper that published press articles on the Pollard case, 1986-87",
+   "quote": "Numerous press articles concerning the Pollard case . by Jerusalem Post correspondent Wolf Blitzer and others appearing in The Jerusalem Post, London Sunday Times, The New York Times, and The Washington Post during 1986-87.",
+   "place_type": "",
+   "country": ""
+  }
+ ],
+ "dropped": [
+  {
+   "name": "Bibliography (cont't)",
+   "why": "page header / section heading"
+  },
+  {
+   "name": "Key to Exemptions",
+   "why": "section heading"
+  },
+  {
+   "name": "Executive Order 13526",
+   "why": "legal order citation, not an entity"
+  },
+  {
+   "name": "Central Intelligence Agency Act of 1949",
+   "why": "statute citation"
+  },
+  {
+   "name": "Freedomoflnfcirmation Act",
+   "why": "statute citation (OCR garbled), not an entity"
+  },
+  {
+   "name": "MORI Doci",
+   "why": "document control ID label (OCR 'MORI DociD'), not an entity"
+  },
+  {
+   "name": "MORI DociD",
+   "why": "document control ID label, not an entity"
+  }
+ ],
+ "rejected": [],
+ "l6_missing": []
+}

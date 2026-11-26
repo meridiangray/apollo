@@ -1,0 +1,769 @@
+{
+ "page": 124,
+ "pairs": [
+  {
+   "pair": 1,
+   "a": "person-jonathan-jay-pollard",
+   "b": "publicbody-us-intelligence-community",
+   "sentence": "MORI DociD: 1346933 October 1984 November 1985 November ' l994 SECRET I._____--Lf3l ________.___._ Pollard also was responsible for conducting liaison with other element .s of the Intelligence Community; For that purpose he was issued a courier card (on 22 October 1994), which permitted him to carry classified material out of any DOD building without being questioned."
+  },
+  {
+   "pair": 2,
+   "a": "person-jonathan-jay-pollard",
+   "b": "publicbody-department-of-defense",
+   "sentence": "MORI DociD: 1346933 October 1984 November 1985 November ' l994 SECRET I._____--Lf3l ________.___._ Pollard also was responsible for conducting liaison with other element .s of the Intelligence Community; For that purpose he was issued a courier card (on 22 October 1994), which permitted him to carry classified material out of any DOD building without being questioned."
+  },
+  {
+   "pair": 3,
+   "a": "publicbody-us-intelligence-community",
+   "b": "publicbody-department-of-defense",
+   "sentence": "MORI DociD: 1346933 October 1984 November 1985 November ' l994 SECRET I._____--Lf3l ________.___._ Pollard also was responsible for conducting liaison with other element .s of the Intelligence Community; For that purpose he was issued a courier card (on 22 October 1994), which permitted him to carry classified material out of any DOD building without being questioned."
+  },
+  {
+   "pair": 4,
+   "a": "person-jonathan-jay-pollard",
+   "b": "publicbody-anti-terrorist-alert-center",
+   "sentence": "The ATAC Of£icer-in~Charge told investigators that Pollard did not do well in the analyst position (in contrast to his excellent performance as a watchstander) because his interest in Middle Eastern affairs and, retrospectively, because his espionage activities for the Israelis took precedence over his assigned duties .."
+  },
+  {
+   "pair": 5,
+   "a": "person-jonathan-jay-pollard",
+   "b": "position-atac-officer-in-charge",
+   "sentence": "The ATAC Of£icer-in~Charge told investigators that Pollard did not do well in the analyst position (in contrast to his excellent performance as a watchstander) because his interest in Middle Eastern affairs and, retrospectively, because his espionage activities for the Israelis took precedence over his assigned duties .."
+  },
+  {
+   "pair": 6,
+   "a": "publicbody-anti-terrorist-alert-center",
+   "b": "position-atac-officer-in-charge",
+   "sentence": "The ATAC Of£icer-in~Charge told investigators that Pollard did not do well in the analyst position (in contrast to his excellent performance as a watchstander) because his interest in Middle Eastern affairs and, retrospectively, because his espionage activities for the Israelis took precedence over his assigned duties .."
+  },
+  {
+   "pair": 7,
+   "a": "person-jonathan-jay-pollard",
+   "b": "place-europe",
+   "sentence": "Pollard and Anne Henderson traveled to Europe."
+  },
+  {
+   "pair": 8,
+   "a": "person-jonathan-jay-pollard",
+   "b": "person-anne-henderson-pollard",
+   "sentence": "Pollard and Anne Henderson traveled to Europe."
+  },
+  {
+   "pair": 9,
+   "a": "place-europe",
+   "b": "person-anne-henderson-pollard",
+   "sentence": "Pollard and Anne Henderson traveled to Europe."
+  },
+  {
+   "pair": 10,
+   "a": "person-jonathan-jay-pollard",
+   "b": "person-rafael-rafi-eitan",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 11,
+   "a": "person-jonathan-jay-pollard",
+   "b": "position-counselor-for-scientific-affairs",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 12,
+   "a": "person-jonathan-jay-pollard",
+   "b": "publicbody-israeli-consulate-new-york",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 13,
+   "a": "person-jonathan-jay-pollard",
+   "b": "place-new-york",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 14,
+   "a": "person-jonathan-jay-pollard",
+   "b": "person-col-aviem-sella",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 15,
+   "a": "person-jonathan-jay-pollard",
+   "b": "person-joseph-yaqur",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 16,
+   "a": "place-europe",
+   "b": "person-rafael-rafi-eitan",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 17,
+   "a": "place-europe",
+   "b": "position-counselor-for-scientific-affairs",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 18,
+   "a": "place-europe",
+   "b": "publicbody-israeli-consulate-new-york",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 19,
+   "a": "place-europe",
+   "b": "place-new-york",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 20,
+   "a": "place-europe",
+   "b": "person-col-aviem-sella",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 21,
+   "a": "place-europe",
+   "b": "person-joseph-yaqur",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 22,
+   "a": "person-anne-henderson-pollard",
+   "b": "person-rafael-rafi-eitan",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 23,
+   "a": "person-anne-henderson-pollard",
+   "b": "position-counselor-for-scientific-affairs",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 24,
+   "a": "person-anne-henderson-pollard",
+   "b": "publicbody-israeli-consulate-new-york",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 25,
+   "a": "person-anne-henderson-pollard",
+   "b": "place-new-york",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 26,
+   "a": "person-anne-henderson-pollard",
+   "b": "person-col-aviem-sella",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 27,
+   "a": "person-anne-henderson-pollard",
+   "b": "person-joseph-yaqur",
+   "sentence": "Pollard and Anne Henderson traveled to Europe. He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 28,
+   "a": "person-rafael-rafi-eitan",
+   "b": "position-counselor-for-scientific-affairs",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 29,
+   "a": "person-rafael-rafi-eitan",
+   "b": "publicbody-israeli-consulate-new-york",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 30,
+   "a": "person-rafael-rafi-eitan",
+   "b": "place-new-york",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 31,
+   "a": "person-rafael-rafi-eitan",
+   "b": "person-col-aviem-sella",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 32,
+   "a": "person-rafael-rafi-eitan",
+   "b": "person-joseph-yaqur",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 33,
+   "a": "position-counselor-for-scientific-affairs",
+   "b": "publicbody-israeli-consulate-new-york",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 34,
+   "a": "position-counselor-for-scientific-affairs",
+   "b": "place-new-york",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 35,
+   "a": "position-counselor-for-scientific-affairs",
+   "b": "person-col-aviem-sella",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 36,
+   "a": "position-counselor-for-scientific-affairs",
+   "b": "person-joseph-yaqur",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 37,
+   "a": "publicbody-israeli-consulate-new-york",
+   "b": "place-new-york",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 38,
+   "a": "publicbody-israeli-consulate-new-york",
+   "b": "person-col-aviem-sella",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 39,
+   "a": "publicbody-israeli-consulate-new-york",
+   "b": "person-joseph-yaqur",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 40,
+   "a": "place-new-york",
+   "b": "person-col-aviem-sella",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 41,
+   "a": "place-new-york",
+   "b": "person-joseph-yaqur",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 42,
+   "a": "person-col-aviem-sella",
+   "b": "person-joseph-yaqur",
+   "sentence": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  }
+ ],
+ "answers": [
+  {
+   "pair": 1,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 2,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 3,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 4,
+   "tie": "Employment",
+   "direction": "a->b",
+   "role": "analyst",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": "The ATAC Of£icer-in~Charge told investigators that Pollard did not do well in the analyst position (in contrast to his excellent performance as a watchstander) because his interest in Middle Eastern affairs and, retrospectively, because his espionage activities for the Israelis took precedence over his assigned duties .."
+  },
+  {
+   "pair": 5,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 6,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 7,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 8,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 9,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 10,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 11,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 12,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 13,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 14,
+   "tie": "Associate",
+   "direction": "a->b",
+   "role": "first handler",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L."
+  },
+  {
+   "pair": 15,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 16,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 17,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 18,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 19,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 20,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 21,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 22,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 23,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 24,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 25,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 26,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 27,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 28,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 29,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 30,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 31,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 32,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 33,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 34,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 35,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 36,
+   "tie": "Occupancy",
+   "direction": "b->a",
+   "role": "Counselor for Scientific Affairs",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 37,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 38,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 39,
+   "tie": "Employment",
+   "direction": "b->a",
+   "role": "Counselor for Scientific Affairs",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": "He met Rafael Eitan, . the senior Israeli .official in charge of the case; Aviem Sella, Pollard's first handler; and Joseph Yaqur, Counselor for Scientific Affairs, Israeli Consulate New York and I-14 SEORE'fl L...----==----,-------~(£]"
+  },
+  {
+   "pair": 40,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 41,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  },
+  {
+   "pair": 42,
+   "tie": "none",
+   "direction": "a->b",
+   "role": "",
+   "date": "",
+   "startDate": "",
+   "endDate": "",
+   "basis_state": "",
+   "quote": ""
+  }
+ ],
+ "records": [
+  {
+   "id": "p124-t4",
+   "schema": "Employment",
+   "properties": {
+    "employee": [
+     "person-jonathan-jay-pollard"
+    ],
+    "employer": [
+     "publicbody-anti-terrorist-alert-center"
+    ],
+    "notes": [
+     "The ATAC Of£icer-in~Charge told investigators that Pollard did not do well in the analyst position (in contrast to his excellent performance as a watchstander) because his interest in Middle Eastern affairs and, retrospectively, because his espionage activities for the Israelis took precedence over his assigned duties .."
+    ],
+    "role": [
+     "analyst"
+    ]
+   },
+   "_page": 124
+  }
+ ],
+ "rejected": [
+  {
+   "pair": 14,
+   "why": [
+    "L2 pair 14: not a full sentence (stops mid-word): 'He met Rafael Eitan, . the senior Israeli .official in charg'"
+   ]
+  },
+  {
+   "pair": 36,
+   "why": [
+    "L2 pair 36: not a full sentence (does not end with . ? or !): 'He met Rafael Eitan, . the senior Israeli .official in charg'"
+   ]
+  },
+  {
+   "pair": 39,
+   "why": [
+    "L2 pair 39: not a full sentence (does not end with . ? or !): 'He met Rafael Eitan, . the senior Israeli .official in charg'"
+   ]
+  }
+ ],
+ "how": "escalated",
+ "problems": [
+  "L2 pair 14: not a full sentence (stops mid-word): 'He met Rafael Eitan, . the senior Israeli .official in charg'",
+  "L2 pair 36: not a full sentence (does not end with . ? or !): 'He met Rafael Eitan, . the senior Israeli .official in charg'",
+  "L2 pair 39: not a full sentence (does not end with . ? or !): 'He met Rafael Eitan, . the senior Israeli .official in charg'"
+ ],
+ "widened": false
+}

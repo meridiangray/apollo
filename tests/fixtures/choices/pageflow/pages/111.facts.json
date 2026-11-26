@@ -1,0 +1,29 @@
+{
+ "page": 111,
+ "how": "repaired",
+ "problems": [],
+ "records": [
+  {
+   "id": "p111-ce1",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Pollard attends Weizman Institute Science Camp in Israel"
+    ],
+    "involved": [
+     "person-jonathan-jay-pollard"
+    ],
+    "location": [
+     "Israel"
+    ],
+    "notes": [
+     "Pollard attended Weizman Institute Science Camp in Israel, which extolled Zionism and encouraged emigration to Israel."
+    ]
+   },
+   "_page": 111,
+   "_place": "place-israel"
+  }
+ ],
+ "rejected": [],
+ "unknown_names": []
+}

@@ -1,0 +1,154 @@
+{
+ "page": 38,
+ "how": "escalated",
+ "problems": [
+  "L2 record e4: not a full sentence (does not start with a capital letter): '~-Yaqur and Eitan provided initial, detailed taskings on the'"
+ ],
+ "records": [
+  {
+   "id": "p38-ce1",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Pollard meets Eitan"
+    ],
+    "involved": [
+     "person-jonathan-jay-pollard",
+     "person-rafael-rafi-eitan"
+    ],
+    "notes": [
+     "Several important developments occurred during the meetings: --Pollard met Rafael (Rafi) Eitan, a senior career official in Israeli intelligence, former adviser on counterterrorism to the Israeli Prime Minister, and the person in charge of the operation."
+    ]
+   },
+   "_page": 38,
+   "_place": ""
+  },
+  {
+   "id": "p38-ce2",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Transfer of Pollard's direct handling from Sella to Yagur"
+    ],
+    "involved": [
+     "person-col-aviem-sella",
+     "person-joseph-yossi-yagur",
+     "person-jonathan-jay-pollard"
+    ],
+    "notes": [
+     "Direct handling of Pollard in the United States was transferred from Sella to Joseph (Yossi) Yagur, Counselor for Scientific Affairs, Israeli Consulate New York; Eitan and Yagur warned Pollard against further operational contact with Sella."
+    ]
+   },
+   "_page": 38,
+   "_place": "place-united-states"
+  },
+  {
+   "id": "p38-ce3",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Eitan and Yagur warn Pollard against further contact with Sella"
+    ],
+    "involved": [
+     "person-rafael-rafi-eitan",
+     "person-joseph-yossi-yagur",
+     "person-jonathan-jay-pollard"
+    ],
+    "notes": [
+     "Direct handling of Pollard in the United States was transferred from Sella to Joseph (Yossi) Yagur, Counselor for Scientific Affairs, Israeli Consulate New York; Eitan and Yagur warned Pollard against further operational contact with Sella."
+    ]
+   },
+   "_page": 38,
+   "_place": ""
+  },
+  {
+   "id": "p38-ce5",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Yagur's tasking on military and scientific intelligence on Arab States, Pakistan and the Soviet Union"
+    ],
+    "involved": [
+     "person-joseph-yossi-yagur",
+     "person-jonathan-jay-pollard"
+    ],
+    "notes": [
+     "Yagur emphasized that Pollard should .seek military and scientific intelligence on Arab States, Pakistan, and the Soviet Union in its role a's military patron of the Arabs."
+    ]
+   },
+   "_page": 38,
+   "_place": ""
+  },
+  {
+   "id": "p38-ce6",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Eitan requests the RASIN Manual"
+    ],
+    "involved": [
+     "person-rafael-rafi-eitan",
+     "person-jonathan-jay-pollard"
+    ],
+    "notes": [
+     "Eitan requested the only specific document mentioned at the Paris meetings, the \"RASIN Manual,\" which he could only describe as a document concerning signals intelli .gence."
+    ]
+   },
+   "_page": 38,
+   "_place": "place-paris"
+  },
+  {
+   "id": "p38-ce7",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Eitan requests further intelligence from Pollard"
+    ],
+    "involved": [
+     "person-rafael-rafi-eitan",
+     "person-jonathan-jay-pollard"
+    ],
+    "notes": [
+     "Eitan also requested information on PLO Force 17, material reporting \"dirt\" · on Israeli political figures, any information that would identify Israeli officials who were providing information to the United States, and any information on US intelligence operations targeted against Israel ."
+    ]
+   },
+   "_page": 38,
+   "_place": ""
+  }
+ ],
+ "rejected": [
+  {
+   "id": "e4",
+   "schema": "Event",
+   "properties": {
+    "name": [
+     "Initial detailed taskings to Pollard"
+    ],
+    "involved": [
+     "person-joseph-yossi-yagur",
+     "person-rafael-rafi-eitan",
+     "person-jonathan-jay-pollard"
+    ]
+   },
+   "notes": "~-Yaqur and Eitan provided initial, detailed taskings on the intelligence Pollard was to obtain.",
+   "basis_property": "",
+   "basis_state": "",
+   "place": "",
+   "why": [
+    "L2 record e4: not a full sentence (does not start with a capital letter): '~-Yaqur and Eitan provided initial, detailed taskings on the'"
+   ]
+  }
+ ],
+ "unknown_names": [
+  {
+   "name": "Israeli intelligence",
+   "kind": "PublicBody",
+   "quote": "Several important developments occurred during the meetings: --Pollard met Rafael (Rafi) Eitan, a senior career official in Israeli intelligence, former adviser on counterterrorism to the Israeli Prime Minister, and the person in charge of the operation."
+  },
+  {
+   "name": "Israeli Prime Minister",
+   "kind": "Position",
+   "quote": "Several important developments occurred during the meetings: --Pollard met Rafael (Rafi) Eitan, a senior career official in Israeli intelligence, former adviser on counterterrorism to the Israeli Prime Minister, and the person in charge of the operation."
+  }
+ ]
+}
