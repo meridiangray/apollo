@@ -3,13 +3,12 @@
     page(source, n)   -> {ok, source, page, total, kind: pages | parts, text, layer: text | ocr | proofread | none}
 
 A PDF's page comes from `pdftotext` in reading order (one page at a time); a text source (a dropped TXT, MD, HTML or DOCX, already
-turned into text) is cut into parts as the page flow cuts it, and a part stands for a page. Each source's text is cached
+turned into text) is cut into parts by the page flow's own split over hydra's text (`source_pages`), and a part stands for a page. Each source's text is cached
 under state/pagetext/<source>/, keyed by the file's size and time, so a changed file is read again. A page with no text layer
 that OCR has read (state/tools/<source>/ocr.json) shows the OCR text, `layer` ocr.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import re
@@ -48,7 +47,7 @@ def _file(prof: dict) -> Path:
 
 def _stamp(f: Path) -> str:
     st = f.stat()
-    return f"{st.st_size}:{st.st_mtime_ns}"
+    return f"{st.st_size}:{st.st_mtime_ns}:hydra-text"       # parts are cut from hydra's text; older caches cut the raw file
 
 
 def _pdf_total(pdf: Path) -> int | None:
@@ -70,12 +69,19 @@ def _pdf_page(pdf: Path, n: int) -> str:
     return p.stdout.replace("\f", "").strip("\n")
 
 
-def _parts(text: str, size: int) -> list[str]:
-    spec = importlib.util.spec_from_file_location("_pt_triage", runfiles.PAGEFLOW / "triage.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    got = mod.parts_of({"text": text}, size)
-    return [got[k] for k in sorted(got)]
+def source_pages(source: str, archive=None, pages=None) -> dict[int, str]:
+    """{page: text} of `source` exactly as the page-flow driver sees it: hydra's own text of the file, split by
+    pageflow/triage.py `split_pages` (a PDF's pages, else parts of the source's `part_chars`). `pages`: the page numbers
+    wanted (any iterable of ints), default all; a page the source lacks is left out. `archive`: the archive a run works
+    in; the text is the source file's, the same in every archive."""
+    import triage                                            # pageflow/triage.py (runfiles puts pageflow on sys.path)
+    from hydra_mcp import files
+    prof = _profile(source)
+    f = _file(prof)
+    if not f.is_file():
+        raise ValueError(f"the source's file is missing: {f.name}")
+    got, _ = triage.split_pages(files.read(f), prof.get("part_chars"))
+    return got if pages is None else {n: got[n] for n in pages if n in got}
 
 
 def _ocr_text(source: str, n: int) -> str | None:
@@ -128,7 +134,8 @@ def page(source: str, n: int, raw: bool = False) -> dict:
             if pf.is_file():
                 parts = json.loads(pf.read_text(encoding="utf-8"))
             else:
-                parts = _parts(f.read_text(encoding="utf-8", errors="replace"), int(prof.get("part_chars") or 3500))
+                got = source_pages(source)
+                parts = [got[k] for k in sorted(got)]
                 pf.write_text(json.dumps(parts, ensure_ascii=False), encoding="utf-8")
             total = len(parts)
             if n > total:

@@ -166,3 +166,27 @@ def test_a_workflow_run_takes_its_source_from_its_name():
     apollo._SOURCES_MEMO.update(at=time.time(), titles={"tarbell-standard-oil": "Standard Oil", "oil": "Oil"})
     assert apollo.run_source(rec) == "tarbell-standard-oil" and apollo.source_title(rec) == "Standard Oil"
     assert apollo.run_source({**rec, "name": "links-other"}) is None
+
+
+def test_a_workflow_run_takes_its_source_from_the_collections_its_prompt_names(tmp_path):
+    apollo._SOURCES_MEMO.update(at=time.time(), titles={"tarbell-standard-oil": "Standard Oil", "mapsaud-alwaleed": "Al Waleed"})
+    (tmp_path / "prompt.md").write_text("x\nCollections (the run's own; work on their entities only): tarbell-standard-oil-actors, tarbell-standard-oil-places\n", encoding="utf-8")
+    rec = {"id": "x", "name": "links-draft", "kind": "mcp-session", "archive": None, "run_folder": str(tmp_path)}
+    assert apollo.run_source(rec) == "tarbell-standard-oil" and apollo.source_title(rec) == "Standard Oil"
+    (tmp_path / "prompt.md").write_text("Collections (the run's own; work on their entities only): tarbell-standard-oil-actors, mapsaud-alwaleed\n", encoding="utf-8")
+    assert apollo.run_source(rec) is None
+    assert apollo.scope_source(["tarbell-standard-oil-actors"]) == "tarbell-standard-oil" and apollo.scope_source([]) is None
+
+
+def test_a_question_another_run_asked_first_still_shows_in_the_run_whose_sweep_reports_it(tmp_path):
+    a = _archive_with_two_runs(tmp_path)                                    # ask-2 was asked at 20:00, before this run's window
+    run = tmp_path / "run"
+    run.mkdir()
+    sweep = json.dumps({"asked": {"r1|wikidata-find": "ask-1", "r2|resolve.x": "ask-2", "r3|resolve.x": "ask-2"}})
+    ev = {"type": "user", "message": {"content": [{"type": "tool_result", "content": [{"type": "text", "text": sweep}]}]}}
+    (run / "transcript.jsonl").write_text(json.dumps(ev) + "\n", encoding="utf-8")
+    f = runfiles.RunFiles(run, "mcp-session", str(a))
+    f.window = (runfiles.epoch("2026-11-25T20:30:00Z"), runfiles.epoch("2026-11-25T20:31:00Z"))
+    assert sorted(q["id"] for q in f.questions()) == ["ask-1", "ask-2"]
+    got = runfiles.workflow_changes(str(a), f.window, f.swept())
+    assert got[-1]["kind"] == "asked" and sorted(got[-1]["ids"]) == ["ask-1", "ask-2"]

@@ -40,6 +40,7 @@ const SV = {
   Asked: '<path d="M5 6h14v9H10l-4 3.5V15H5z"/>', Found: '<circle cx=11 cy=11 r=6 /><path d="M20 20l-4.5-4.5"/>', Added: '<path d="M12 5v14M5 12h14"/>',
   Cited: '<path d="M7 7h4v4c0 3-1.5 5-4 6M14 7h4v4c0 3-1.5 5-4 6"/>', Ran: '<path d="M7 4.5v15l12-7.5z"/>', Escalated: '<path d="M12 19V5M6 11l6-6 6 6"/>',
   calls: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>', ok: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', miss: '<path d="M6 6l12 12M18 6L6 18"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',
   seal: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'
 };
 const ic = (n, c = '') => `<span class="ic ${c}"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round aria-hidden=true>${SV[n] || SV.calls}</svg></span>`;
@@ -88,23 +89,26 @@ const cellRec = (st, n) => n ? 's' + bin(n) : isDone(st) ? 'z' : off(st);
 const escMod = h => h.status === 'escalated' || h.status === 'gave-up' ? ' esc' : '';     // escalated: a pattern over its shade, like redacted (owner)
 const HEAT = {
   named: h => state.namedPages && state.namedPages.has(h.page) ? 'tk' : 'tk0',     // Found: where the selected thing is named
+  asked: h => h.asked ? 'e' + Math.min(4, h.asked + 1) : 'tk0',                     // Run: where questions were put to the person
+  changed: h => h.changed ? 's' + bin(h.changed) : 'tk0',                           // a workflow run: where it added, changed or removed records
   status: h => SW[h.status] || 'todo',
   records: h => (h.status === 'doing' && !h.records ? 'doing' : cellRec(h.status, h.records)) + escMod(h),
   quotes: h => cellRec(h.status, h.quotes),
   calls: h => h.calls ? 'e' + binC(h.calls) : off(h.status),
   seconds: h => h.seconds ? 'e' + binT(h.seconds) : off(h.status)
 };
-const HEAT_LABEL = {status: 'Status', records: 'Records', quotes: 'Quotes', places: 'Places', calls: 'Calls', seconds: 'Seconds'};
+const HEAT_LABEL = {changed: 'Changed', asked: 'Asked', status: 'Status', records: 'Records', quotes: 'Quotes', places: 'Places', calls: 'Calls', seconds: 'Seconds'};
 /* heat groups */
 const GROUPS = [['people', 'People'], ['bodies', 'Bodies'], ['places', 'Places'], ['events', 'Events'], ['ties', 'Ties'], ['posts', 'Positions']];
 const GROUP_LABEL = Object.fromEntries(GROUPS);
 for (const [k] of GROUPS) HEAT[k] = h => { const c = cellRec(h.status, (h.groups || {})[k]); return c === 'z' ? 'zg' : c; };   // none of one category on a read page is normal: a quiet cell, not the None outline
 Object.assign(HEAT_LABEL, GROUP_LABEL);
-const HEAT_N = {records: h => h.records, quotes: h => h.quotes, calls: h => h.calls, seconds: h => Math.round(h.seconds)};
+const HEAT_N = {changed: h => h.changed || 0, asked: h => h.asked || 0, records: h => h.records, quotes: h => h.quotes, calls: h => h.calls, seconds: h => Math.round(h.seconds)};
 for (const [k] of GROUPS) HEAT_N[k] = h => (h.groups || {})[k] || 0;
-const heatMeasures = rows => ['records', ...GROUPS.map(g => g[0]).filter(k => rows.some(r => (r.groups || {})[k]))];
+const wfRun = () => ((state.byId || {})[state.sel] || {}).kind === 'mcp-session';          // a workflow run's pages: scope, changed, asked
+const heatMeasures = rows => ['records', ...GROUPS.map(g => g[0]).filter(k => rows.some(r => (r.groups || {})[k])), ...(rows.some(r => r.changed) ? ['changed'] : []), ...(rows.some(r => r.asked) ? ['asked'] : [])];
 // the legend says only what the rows show: records by shade, skipped, escalated; redacted and reading when there are any
-const heatKeys = rows => ['rec', 'skip', 'esc', ...(rows.some(r => r.status === 'redacted' || r.red) ? ['red'] : []), ...(rows.some(r => r.status === 'doing') ? ['doing'] : [])];
+const heatKeys = (rows, asked = false) => rows.length && wfRun() ? ['rec', ...(rows.some(r => r.changed) ? ['chg'] : []), ...(asked && rows.some(r => r.asked) ? ['asked'] : []), ...(rows.some(r => r.status === 'empty') ? ['skip'] : []), ...(rows.some(r => r.status === 'redacted') ? ['red'] : [])] : ['rec', 'skip', 'esc', ...(asked && rows.some(r => r.asked) ? ['asked'] : []), ...(rows.some(r => r.status === 'redacted' || r.red) ? ['red'] : []), ...(rows.some(r => r.status === 'doing') ? ['doing'] : [])];
 const heatTitle = (m, r) => pgw(r.page) + (HEAT_N[m] ? ` · ${HEAT_N[m](r)}` : '');
 const strip3 = cells => `<div class="strip3${cells.length > 40 ? ' dense' : ''}">${cells.map(c => `<i class="${cellRec(c.status, c.records)}" title="p. ${c.page}"></i>`).join('')}</div>`;
 const ppText = cells => cells.length ? `Pages ${cells[0].page}–${cells[cells.length - 1].page}` : '';      // owner: Page 40, not Part 40, for every source
@@ -135,9 +139,11 @@ function modelMeters(s) {
 // ---- the runs, one entry a source: a light for each flow that has run on it (owner: "like an engine light") --------
 // A source is a run's `source`; a workflow run started for a source carries its slug at the end of its name; a run with
 // neither belongs to its archive.
-const FLOW_KEY = {'Read the source': 'read', 'Suggest links': 'links', 'Place names': 'places', 'Fill stubs': 'stubs', 'Enrich': 'enrich',
-                  Read: 'read', Links: 'links', Places: 'places', Stubs: 'stubs'};
-const LIGHTS = [['read', 'Read'], ['links', 'Links'], ['places', 'Places'], ['stubs', 'Stubs'], ['enrich', 'Enrich']];
+const FLOW_KEY = {'Read the source': 'read', 'Suggest links': 'wikidata', 'Place names': 'places', 'Fill stubs': 'stubs', 'Enrich': 'enrich',
+                  Basic: 'read', Read: 'read', Links: 'wikidata', Places: 'places', Stubs: 'stubs', Assemble: 'assemble', Refine: 'refine', Timeline: 'timeline',
+                  Wikidata: 'wikidata', Finance: 'finance', links: 'wikidata'};     // Links became Wikidata (CZ318): old runs show there
+const LIGHTS = [['read', 'Basic'], ['assemble', 'Assemble'], ['refine', 'Refine'], ['timeline', 'Timeline'], ['places', 'Places'], ['stubs', 'Stubs'],
+                ['enrich', 'Enrich'], ['wikidata', 'Wikidata'], ['finance', 'Finance']];
 Object.assign(SV, {person: '<path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/>', download: '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/>', links: '<path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/>'});
 const flowKey = s => s.flow_key || FLOW_KEY[s.flow] || (s.kind === 'pageflow' ? 'read' : 'other');
 const isLive = s => s.status === 'running' || s.status === 'starting' || s.status === 'stopping';
@@ -187,14 +193,20 @@ function lightsHTML(g) {
     return `<button type=button class="lt ${dotOf(top)}" data-id="${esc(top.id)}" title="${esc(`${label}: ${top.status}${n > 1 ? ` · ${n} runs` : ''}`)}">${ic(k)}</button>`;
   }).join('') + '</span>';
 }
+// a mini heat row per flow with a run on the entry's source that has page cells (its newest), in Apollo's flow order, Basic first; with
+// more than one row each carries its flow's icon
+function miniRows(g) {
+  const rows = LIGHTS.map(([k, label]) => ({k, label, run: g.runs.find(r => flowKey(r) === k && (r.cells || []).length)})).filter(x => x.run);
+  return rows.map(({k, label, run}) => `<div class="mini fl-${k}${rows.length > 1 ? " has-mi" : ""}" title="${esc(k === 'read' ? ppText(run.cells) : `${label} · ${ppText(run.cells)}`)}">` +
+    `${rows.length > 1 ? `<span class=mi>${ic(k)}</span>` : ''}${run.cells.map(c => `<i class="${cellRec(c.status, c.records)}"></i>`).join('')}</div>`).join('');
+}
 function srcItem(g) {
-  const top = g.runs[0], read = g.runs.find(r => flowKey(r) === 'read' && (r.cells || []).length);
-  const cells = read ? read.cells : [];
+  const top = g.runs[0];
   const sel = g.runs.some(r => r.id === state.sel);
   const meta = [archName(g.archive) !== g.title ? archName(g.archive) : '', isLive(top) ? stageText(top) || top.status : longWhen(top.started)].filter(Boolean).join(' · ');
   return `<li data-src="${esc(g.key)}"${sel ? ' class=sel' : ''}><i class="dot ${dotOf(top)}"></i><b title="${esc(g.title)}">${esc(g.title)}</b>` +
     `<span></span><small>${esc(meta)}</small>${lightsHTML(g)}` +
-    (cells.length ? `<div class=mini title="${esc(ppText(cells))}">${cells.map(c => `<i class="${cellRec(c.status, c.records)}"></i>`).join('')}</div>` : '') + '</li>';
+    miniRows(g) + '</li>';
 }
 // the selected source's runs, newest first, in the run's head: one button a run
 function runSwitch() {
@@ -252,6 +264,7 @@ function layout() {
   w.classList.toggle('srcmode', pg === 'sources');
   w.classList.toggle('colmode', pg === 'collections');
   w.classList.toggle('hismode', pg === 'history');
+  w.classList.toggle('setmode', pg === 'settings');                                    // CZ330: Settings
   w.classList.toggle('sel', !cfg && !pg);                // the runs: the sources on the left, the selected run beside them
   w.classList.toggle('one', cfg || !!pg);
   $('#home').setAttribute('aria-current', cfg || pg ? 'false' : 'page');
@@ -259,6 +272,7 @@ function layout() {
   $('#nsrc').setAttribute('aria-pressed', String(pg === 'sources'));
   $('#ncol').setAttribute('aria-pressed', String(pg === 'collections'));
   $('#nhis').setAttribute('aria-pressed', String(pg === 'history'));
+  $('#cog').setAttribute('aria-pressed', String(pg === 'settings'));
 }
 
 function select(id) {
@@ -296,6 +310,7 @@ function head() {
   if (state.tab === 'report' && s.kind !== 'pageflow') setTab('run');
   $('#dname').textContent = (g ? g.title : runName(s)) + (s.dry ? ' (dry)' : '');   // the source; the run is picked below it
   $('#dname').title = s.id;
+  $('[data-tab=runs] small').textContent = (g ? g.runs.length : 0) || '';
   const sw = runSwitch();
   if ($('#route').dataset.k !== sw) { $('#route').dataset.k = sw; $('#route').innerHTML = sw; }
   // one status line: state, where it is, the pages, the time; the live sentence only while it runs
@@ -344,9 +359,21 @@ function setTab(t) {
 
 function tools() { $('#tabtools').innerHTML = ''; }
 
+function renderRunsTab() {
+  const g = groupOf(state.sel), html = sourceRuns(g ? g.runs : []), body = $('#tabbody');
+  if (body.dataset.run === `${state.sel}/runs` && body.dataset.k === html) return;
+  body.dataset.run = `${state.sel}/runs`;
+  body.dataset.k = html;
+  body.innerHTML = `<div class=stab>${html}</div>`;
+}
+$('#tabbody').addEventListener('click', e => {
+  const rn = state.tab === 'runs' && e.target.closest('[data-run]');
+  if (rn) { select(rn.dataset.run); setTab('run'); }
+});
 async function pollView() {
   const id = state.sel, tab = state.tab;
   if (id && !state.gone && tab === 'data') { renderData(); return; }     // the Data tab asks the log itself (data.js)
+  if (id && !state.gone && tab === 'runs') { renderRunsTab(); return; }       // the source's runs, as Sources lists them (sources.js)
   if (!id || state.gone || state.busy.view) return;
   state.busy.view = true;
   try {
@@ -369,7 +396,7 @@ function render() {
   const tab = v.tab;
   if (tab === 'found') $('[data-tab=found] small').textContent = (v.changes ? v.changes.length : v.entity_count) || '';
   if (tab === 'calls') $('[data-tab=calls] small').textContent = ((v.raw || {}).hydra || []).length || '';
-  if (tab === 'questions') $('[data-tab=questions] small').textContent = v.open || '';
+  if (tab === 'questions') $('[data-tab=questions] small').textContent = qRows(v).filter(q => q.status === 'open').length || '';
   if (tab === 'run') return renderRun(v);
   if (tab === 'found') return renderFound(v);
   if (tab === 'raw' || tab === 'calls') return renderRaw(v);
@@ -384,7 +411,10 @@ function render() {
   if (tab === 'questions') {
     const k = `${state.sel}/questions`;
     if (state.seenQ.run !== k) state.seenQ = {run: k, seen: new Set()};
-    motionArrive(body, '.card', e => e.querySelector('.h').textContent, state.seenQ.seen);
+    motionArrive(body, '.qc', e => e.dataset.q, state.seenQ.seen);
+    const on = $('.qc.sel', body);
+    if (on && state.q.reveal) on.scrollIntoView({block: 'nearest'});
+    state.q.reveal = false;
   }
 }
 
@@ -397,14 +427,15 @@ function legend(keys) {
     esc: '<span><i class="s3 esc"></i>Escalated</span>', doing: '<span><i class=doing></i>Reading</span>', named: '<span><i class="tk lgtk"></i>Named</span>',
     eff: '<span><span class=sw><i class=e1></i><i class=e3></i><i class=e5></i></span>Effort</span>',
     none: '<span><i class=z></i>None</span>', todo: '<span><i class=todo></i>To do</span>', skip: '<span><i class=skip></i>Skipped</span>',
-    red: '<span><i class=redacted></i>Redacted</span>'
+    chg: '<span><span class=sw><i class=s1></i><i class=s3></i><i class=s5></i></span>Changed</span>',
+    red: '<span><i class=redacted></i>Redacted</span>', asked: '<span><span class=sw><i class=e2></i><i class=e4></i></span>Questions</span>'
   };
   return `<div class=lg>${keys.map(k => L[k]).join('')}</div>`;
 }
 function heatGrid(rows, measures) {
   const np = rows.length, from = rows[0].page, to = rows[np - 1].page;
   const pos = p => ((p - from + .5) / np * 100).toFixed(2) + '%';
-  let h = measures.map(m => `<span class=l>${HEAT_LABEL[m]}</span><div class="r${m === 'named' ? ' ticks' : m === 'records' || m === 'status' || measures.length === 1 ? ' tall' : ''}" data-row=${m} data-css="--np:${np}">` +
+  let h = measures.map(m => `<span class=l>${HEAT_LABEL[m]}</span><div class="r${m === 'named' || m === 'asked' ? ' ticks' : m === 'records' || m === 'status' || measures.length === 1 ? ' tall' : ''}" data-row=${m} data-css="--np:${np}">` +
     rows.map(r => `<i class="${HEAT[m](r)}" data-p="${r.page}" title="${heatTitle(m, r)}"></i>`).join('') + '</div>').join('');
   const ticks = [];
   const step = np > 400 ? 100 : np > 150 ? 50 : 10;                 // axis numbers that do not collide on a long source
@@ -424,7 +455,8 @@ function animateCells(cells, initial) {
 function tipText(h) {
   const small = [];
   for (const [k, n] of Object.entries(h.problems || {})) small.push(`${k}: ${n} ${n === 1 ? 'problem' : 'problems'}`);
-  if (isDone(h.status)) small.push(`${h.records} records`, `${h.quotes} quoted`, `${h.places || 0} places`, `${h.calls} calls`, `${Math.round(h.seconds)} s`);
+  if (isDone(h.status) && wfRun()) small.push(`${h.records} in scope`, ...(h.changed ? [`${h.changed} changed`] : []), ...(h.asked ? [`${h.asked} asked`] : []));
+  else if (isDone(h.status)) small.push(`${h.records} records`, `${h.quotes} quoted`, `${h.places || 0} places`, `${h.calls} calls`, `${Math.round(h.seconds)} s`);
   if (h.reason) small.push(h.reason);
   return `<b>${pgw(h.page)}</b> · ${esc(WORD[h.status] || h.status)}${small.length ? `<small>${esc(small.join(' · '))}</small>` : ''}`;
 }
@@ -440,7 +472,7 @@ function renderRun(v) {
     state.pendingPage = null;
     state.openRow = null;
     body.innerHTML = '<div class=rcols><div class=rleft>' + (rows.length ? `<div class=sect>Pages <small>${ppText(rows)}</small></div><div class="hm tipped"></div>` +
-      legend(heatKeys(rows)) : '') + '<div class=sect>Log</div>' + logBar() + '<ol class=log></ol></div>' +
+      legend(heatKeys(rows, true)) : '') + '<div class=sect>Log</div>' + logBar() + '<ol class=log></ol></div>' +
       '<aside class=rail id=runrail data-ctx=run aria-label=Rail></aside></div>';
     const hm = $('.hm', body);
     if (hm) {
@@ -940,6 +972,36 @@ function renderRaw(v) {
   }
   drawRaw();
 }
+/* CZ335: Call notes. A call's note unfolded: what it did, its counts, hydra's lint lines, the records it touched */
+const callClock = at => /^\d{4}-\d{2}-\d{2}T/.test(String(at || '')) ? String(at).slice(11, 19) : at;
+const noteRec = (n, id) => {
+  const x = (n.recs || {})[id];
+  return `<button type=button class=cnr data-rid="${esc(id)}"${x ? ` data-nm="${esc(x.name)}" data-col="${esc(x.col || '')}" data-sch="${esc(x.schema || '')}"` : ''}>${esc(x ? x.name : id)}</button>`;
+};
+function noteHTML(n) {
+  const counts = Object.entries(n.counts || {}).filter(([, v]) => v !== null && v !== undefined);
+  const lint = (n.lint || []).filter(x => x && x.say);
+  const shown = new Set(lint.map(x => x.id));
+  const refs = (n.refs || []).filter(id => !shown.has(id));
+  return `<p class=cdid>${esc(n.did)}</p>` +
+    (counts.length ? `<div class=cchips>${counts.map(([k, v]) => `<span class=cchip>${esc(k)} <b>${esc(v)}</b></span>`).join('')}</div>` : '') +
+    (lint.length ? `<ul class=clint>${lint.map(x => `<li><span class=crule>${esc(x.rule || '')}</span>${x.id ? noteRec(n, x.id) : ''}<span>${esc(x.say)}</span></li>`).join('')}</ul>` : '') +
+    (refs.length || n.refs_more ? `<div class=crefs>${refs.map(id => noteRec(n, id)).join('')}${n.refs_more ? `<span class=cmore>+${esc(n.refs_more)}</span>` : ''}</div>` : '');
+}
+async function openNoteRecord(b) {                                        // the record opens as the Collections page's Selected card
+  const arch = (state.rawView || {}).archive, col = b.dataset.col;
+  if (!arch || !col) return;
+  state.page = null;
+  showPage('collections');
+  state.col.archive = arch;
+  await loadCollections();
+  await selectCollection(col);
+  etSelect({id: b.dataset.rid, name: b.dataset.nm || b.dataset.rid, schema: b.dataset.sch, collection: col, archive: arch});
+}
+$('#tabbody').addEventListener('click', e => {
+  const b = e.target.closest('.cnr[data-rid]');
+  if (b) { e.stopPropagation(); openNoteRecord(b); }
+});
 function rawRowHTML(sec, r, i, open, cache) {
   const k = `${sec}/${i}`;
   const on = open === k;
@@ -949,9 +1011,14 @@ function rawRowHTML(sec, r, i, open, cache) {
     return `<div class="rw${r.ok === false ? ' bad' : ''}" data-k="${k}" role=button tabindex=0 aria-expanded=${on}>${tw}<time>${esc(dayTime(r.at))}</time><span class=rv>#${r.n}</span>` +
       `<span class=ro>${esc(r.label || '')}</span><span class=rm>${modelMark(r.model) || esc(modelLabel(r.model))}</span><span class=rwt>${secs(r.ms)}</span><span class=rwt>${r.ok === false ? 'error' : r.answer_chars != null ? `${kChars(r.answer_chars)} chars` : ''}</span></div>${more}`;
   }
+  if (sec === 'hydra' && r.note && r.note.did) {                      // a call with a note: what it did, not its arguments
+    const more = on ? `<div class=rwd>${noteHTML(r.note)}</div>` : '';
+    return `<div class="rw${r.ok === false ? ' bad' : ''}" data-k="${k}" role=button tabindex=0 aria-expanded=${on}>${tw}<time title="${esc(longWhen(r.at))}">${esc(dayTime(callClock(r.at)))}</time>` +
+      (on ? `<span class=rv>${esc(r.tool)}</span>` : `<span class="rv cdo" title="${esc(r.tool)}">${esc(r.note.did)}</span>`) + `<span class=ro></span><span class=rwt>${secs(r.ms)}</span><span class=rwt>${r.ok === false ? 'error' : 'ok'}</span></div>${more}`;
+  }
   if (sec === 'hydra') {
     const more = on ? `<div class=rwd><pre class=raw>${esc(r.args || '')}${r.text ? '\n' + esc(r.text) : ''}</pre></div>` : '';
-    return `<div class="rw${r.ok === false ? ' bad' : ''}" data-k="${k}" role=button tabindex=0 aria-expanded=${on}>${tw}<time>${esc(dayTime(r.at))}</time><span class=rv>${esc(r.tool)}</span>` +
+    return `<div class="rw${r.ok === false ? ' bad' : ''}" data-k="${k}" role=button tabindex=0 aria-expanded=${on}>${tw}<time title="${esc(longWhen(r.at))}">${esc(dayTime(callClock(r.at)))}</time><span class=rv>${esc(r.tool)}</span>` +
       `<span class=ro>${esc(r.args || '')}</span><span class=rwt>${secs(r.ms)}</span><span class=rwt>${r.ok === false ? 'error' : 'ok'}</span></div>${more}`;
   }
   if (sec === 'transcript') {
@@ -968,7 +1035,12 @@ function drawRaw() {
   const text = r => typeof r === 'string' ? r : Object.values(r).join(' ');
   const rows = (v[f.sec] || []).map((r, i) => [r, i]).filter(([r]) => !q || text(r).toLowerCase().includes(q));
   const cache = state.rawCache || {};
-  const html = rows.slice(-400).map(([r, i]) => rawRowHTML(f.sec, r, i, f.open, cache)).join('') || '<div class=lnone>Nothing matches.</div>';
+  let at = null;                                                          // Calls: rows grouped under the task step they ran in
+  const grouped = f.sec === 'hydra' && rows.some(([r]) => r.step);
+  const html = rows.slice(-400).map(([r, i]) => {
+    const head = grouped && (r.step || null) !== at && (at = r.step || null) ? `<div class=cgh title="${esc(r.step)}">${esc(r.step)}</div>` : '';
+    return head + rawRowHTML(f.sec, r, i, f.open, cache);
+  }).join('') || '<div class=lnone>Nothing matches.</div>';
   if (box.dataset.k !== html) { const y = body.scrollTop; box.dataset.k = html; box.innerHTML = html; body.scrollTop = y; }
   const lc = $('.rawbar .lc', body);
   if (lc) lc.textContent = rows.length === (v[f.sec] || []).length ? '' : `${rows.length} of ${v[f.sec].length}`;
@@ -989,22 +1061,131 @@ async function openRaw(k) {
   drawRaw();
 }
 
-// the questions this run asked: what they are about by name (the ids stay in the title), the options as chips
-function questionsTab(v) {
-  const rows = v.rows || [];
-  if (!rows.length) return '<div class=lnone>No questions.</div>';
-  return rows.map(q => {
-    const names = (q.records || []).map(r => (q.labels || {})[r]).filter(Boolean);
-    const h = [`<span class="st ${esc(q.status)}">${esc(q.status)}</span>`, names.length ? `<b title="${esc(q.id)}">${esc(names.join(' ↔ '))}</b>` : ''].filter(Boolean);
-    if (q.page) h.push(pgw(q.page));
-    const a = q.answer ? [q.answer.choice, q.answer.text].filter(Boolean).join(' — ') : '';
-    return `<div class=card><div class=h>${h.join('<span>·</span>')}</div><div class=qq>${esc(q.question)}</div>` +
-      (q.quote ? `<div class=quote>“${esc(q.quote)}”</div>` : '') +
-      (q.options && q.options.length ? `<div class=meta>${q.options.map(o => `<span class=chip>${esc(o)}</span>`).join('')}</div>` : '') +
-      (q.suggestion ? `<div class=meta>Suggested: ${esc(q.suggestion)}</div>` : '') +
-      (a ? `<div class=ans>${esc(a)}</div>` : '') + '</div>';
-  }).join('');
+// ---- Questions: each with its evidence and the buttons hydra offers; one click answers it (answering.py) -----------------
+// A click shows the answer at once and goes to hydra under its lock; the next open question is selected. An answered one
+// keeps its answer, who gave it and when, with an Undo (hydra's history keeps both steps).
+state.q = {sel: null, local: {}, reveal: false, run: '', pos: new Map(), more: {}};
+const QKIND = {wikidata: 'Wikidata', 'same-name': 'Short name'};
+const qKind = q => QKIND[q.kind] || (q.kind ? title(q.kind) : 'Question');
+// the order the questions were first seen in this run: an answered one stays where it was (the manager lists open ones first)
+function qRows(v) {
+  if (state.q.run !== v.id) state.q = {...state.q, run: v.id, sel: null, local: {}, pos: new Map(), more: {}};
+  const rows = (v.rows || []).map(q => state.q.local[q.id] ? {...q, ...state.q.local[q.id]} : q);
+  for (const q of rows) if (!state.q.pos.has(q.id)) state.q.pos.set(q.id, state.q.pos.size);
+  return rows.sort((a, b) => state.q.pos.get(a.id) - state.q.pos.get(b.id));
 }
+const qDone = q => q.status !== 'open';
+// the choices on screen: three candidates at a time (hydra's order), then None of these and Check for more
+const Q_TOP = 3;
+function qShown(q) {
+  const chs = q.choices || [], none = chs.find(c => c.none), cands = chs.filter(c => !c.none);
+  if (cands.length <= Q_TOP) return {cands, none, more: false, all: chs};
+  const at = Math.min(state.q.more[q.id] || 0, Math.floor((cands.length - 1) / Q_TOP) * Q_TOP);
+  return {cands: cands.slice(at, at + Q_TOP), none, more: at + Q_TOP < cands.length, all: chs};
+}
+const qPassage = p => {
+  if (!p || !p.text) return '';
+  const i = p.mark ? p.text.toLowerCase().indexOf(p.mark.toLowerCase()) : -1;
+  const body = i < 0 ? esc(p.text) : `${esc(p.text.slice(0, i))}<b>${esc(p.text.slice(i, i + p.mark.length))}</b>${esc(p.text.slice(i + p.mark.length))}`;
+  return `<q title="${esc(p.text)}">${body}</q>` + (p.page ? `<span class=qpg>${esc(pgw(p.page))}</span>` : '');
+};
+function questionsTab(v) {
+  const rows = qRows(v);
+  if (!rows.length) return '';
+  const sel = rows.some(q => q.id === state.q.sel) ? state.q.sel : null;
+  const card = q => {
+    const open = !qDone(q);
+    const sh = qShown(q);
+    const longer = sh.cands.some(c => c.label.length > 26);
+    const a = q.answer || {};
+    const by = [a.by, a.at ? longWhen(a.at) : ''].filter(Boolean).join(' · ');
+    const body = open
+      ? `<div class="qa${longer ? ' list' : ''}">${sh.cands.map((c, i) => `<button type=button class=btn data-c="${esc(c.choice)}" data-l="${esc(c.label)}">${i < 9 ? `<kbd>${i + 1}</kbd>` : ''}${esc(c.label)}</button>`).join('')}</div>` +
+        (sh.none || sh.more || q.group === 'asked' ? '<div class="qa qr">' +
+          (sh.none ? `<button type=button class=btn data-c="${esc(sh.none.choice)}" data-l="${esc(sh.none.label)}" title=0><kbd>0</kbd>${esc(sh.none.label)}</button>` : '') +
+          (sh.more ? '<button type=button class=btn data-more=1 title=M><kbd>M</kbd>Check for more</button>' : '') +
+          (q.group === 'asked' ? '<button type=button class=x data-c=dismiss data-l=Dismissed>Dismiss</button>' : '') + '</div>' : '')
+      : `<div class=qd><b>${esc([a.choice, a.text].filter(Boolean).join(' — ') || 'Answered')}</b>${by ? `<span>${esc(by)}</span>` : ''}</div>`;
+    return `<article class="qc${open ? '' : ' done'}${q.id === sel ? ' sel' : ''}" data-q="${esc(q.id)}" title="${esc(q.id)}">` +
+      `<span class=qi>${ic(open ? 'Asked' : 'ok')}</span>` +
+      `<div class=qh><b>${esc(qKind(q))}</b>${q.page && !(q.passage && q.passage.page) ? `<span>${pgw(q.page)}</span>` : ''}<span class=grow></span>` +
+      (open ? '' : `<button type=button class=undo title=Undo aria-label=Undo>${ic('undo')}</button>`) + '</div>' +
+      `<p class=qq title="${esc(q.question)}">${esc(q.question)}</p>` +
+      qPassage(q.passage) +
+      (open && q.suggestion && q.group === 'asked' && !q.passage ? `<div class=qs>${esc(q.suggestion)}</div>` : '') + body + '</article>';
+  };
+  return `<div class=ql>${rows.map(card).join('')}</div>`;
+}
+// the next question to select after one is answered: the open one below it, else the open one above
+function qNext(rows, id) {
+  const i = rows.findIndex(q => q.id === id);
+  const open = (a, b) => rows.slice(a, b).filter(q => !qDone(q));
+  return (open(i + 1)[0] || open(0, i).pop() || {}).id || null;
+}
+async function qWait() {
+  for (let n = 0; n < 50 && state.busy.view; n++) await new Promise(r => setTimeout(r, 100));
+}
+async function answerQ(id, choice, label) {
+  const run = state.sel, rows = qRows(state.view);
+  const was = rows.find(q => q.id === id);
+  if (!was) return;
+  state.q.local[id] = choice === 'clear' ? {status: 'open', answer: null}
+    : {status: choice === 'dismiss' ? 'dismissed' : 'answered', answer: {choice: label, text: null, by: 'you', at: new Date().toISOString()}};
+  state.q.sel = choice === 'clear' ? id : qNext(rows, id);
+  state.q.reveal = true;
+  state.viewKey = '';
+  render();
+  try {
+    await api(`/api/answer/${encodeURIComponent(run)}`, {question: id, choice});
+    await qWait();
+    if (run === state.sel) await pollView();
+  } catch (e) {
+    notify('error', `Answer: ${e.message}`);
+  }
+  delete state.q.local[id];
+  if (run === state.sel && state.tab === 'questions') { state.viewKey = ''; render(); }
+}
+function qMore(id) {
+  const q = qRows(state.view).find(x => x.id === id);
+  if (!q || !qShown(q).more) return;
+  state.q.more[id] = (state.q.more[id] || 0) + Q_TOP;
+  state.q.sel = id;
+  state.viewKey = '';
+  render();
+}
+$('#tabbody').addEventListener('click', e => {
+  if (state.tab !== 'questions') return;
+  const c = e.target.closest('.qc');
+  if (!c) return;
+  const id = c.dataset.q, b = e.target.closest('button[data-c]');
+  if (e.target.closest('.undo')) return answerQ(id, 'clear', '');
+  if (e.target.closest('[data-more]')) return qMore(id);
+  if (b) return answerQ(id, b.dataset.c, b.dataset.l);
+  state.q.sel = state.q.sel === id ? null : id;
+  state.viewKey = '';
+  render();
+});
+document.addEventListener('keydown', e => {                    // ↑ ↓ move between questions; 1–3 the candidates shown, 0 or N none of these, M check for more
+  if (state.tab !== 'questions' || state.page || e.ctrlKey || e.metaKey || e.altKey || !state.view || state.view.tab !== 'questions') return;
+  if (e.target.closest && e.target.closest('input, textarea, select, dialog, [contenteditable]')) return;
+  const rows = qRows(state.view);
+  const i = rows.findIndex(q => q.id === state.q.sel);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!rows.length) return;
+    e.preventDefault();
+    const j = e.key === 'ArrowDown' ? Math.min(rows.length - 1, i + 1) : i < 0 ? rows.length - 1 : Math.max(0, i - 1);
+    state.q.sel = rows[j].id;
+    state.q.reveal = true;
+    state.viewKey = '';
+    render();
+  } else if (/^[0-9mMnN]$/.test(e.key) && i >= 0 && !qDone(rows[i])) {
+    const sh = qShown(rows[i]), k = e.key.toLowerCase();
+    if (k === 'm') { if (sh.more) { e.preventDefault(); qMore(rows[i].id); } return; }
+    const c = k === '0' || k === 'n' ? sh.none : sh.cands[Number(k) - 1];
+    if (c) { e.preventDefault(); answerQ(rows[i].id, c.choice, c.label); }
+  }
+});
+
 
 // ---- Report: targets, pages, passes, calls by tool, slowest, cost; the written report below --------------------------
 function writtenReport(v) {
@@ -1039,7 +1220,7 @@ function reportTab(v) {
     `<div class=tb>${m.tools.map(t => `<span class=t>${esc(t.tool)}</span><span class=bar><i data-w="${(t.seconds / top * 100).toFixed(1)}"></i></span><span class=v>${Math.round(t.seconds)} s</span><span class=c>${t.calls}</span>`).join('')}</div>`;
   const sl = `<div class=sl>${m.slowest.map(c => `<time>${esc(dayTime(c.at))}</time><span class=t>${esc(c.tool)}</span><span class=v>${c.seconds} s</span>`).join('')}</div>`;
   const cost = `<div class=cost>${m.cost.map(c => `<span class=k>${esc(c.label)}</span>${meter(c.used, c.cap)}<span class=v>${usd(c.usd)}</span><span class=n>${c.used} of ${c.cap ?? '∞'} calls</span>`).join('')}</div>`;
-  const heat = v.heat && v.heat.length ? `<div class=sect>Pages</div><div class=hm>${heatGrid(v.heat, heatMeasures(v.heat))}</div>${legend(heatKeys(v.heat))}` : '';   // the run's pages at a glance, as drawn (apollo-ui.html Report)
+  const heat = v.heat && v.heat.length ? `<div class=sect>Pages</div><div class=hm>${heatGrid(v.heat, heatMeasures(v.heat).filter(m => m !== 'asked'))}</div>${legend(heatKeys(v.heat))}` : '';   // the run's pages at a glance, as drawn (apollo-ui.html Report)
   const wall = m.wall_seconds != null ? m.wall_seconds : tot;
   const body = `${m.targets.length ? `<div class=sect>Targets <small>${met} of ${m.targets.length} met</small></div>${chips}` : ''}${heat}` +
     `<div class=rgrid><div><div class=sect>Passes <small>${elapsed(wall)}</small></div>${pbar}` +
@@ -1063,6 +1244,7 @@ function showPage(p) {
   if (state.page === 'sources') openSources();
   if (state.page === 'collections') openCollections();
   if (state.page === 'history') openHistory();
+  if (state.page === 'settings') openSettings();
 }
 $('#nrun').onclick = () => { if (state.cfg) closeCfg(); else { state.page = null; openCfg('full'); } };
 $('#nsrc').onclick = () => showPage('sources');
@@ -1092,7 +1274,13 @@ Object.assign(SV, {
   enrich: '<path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2-2a2 2 0 0 1-2-2a2 2 0 0 1-2 2zM16 6a2 2 0 0 1 2 2a2 2 0 0 1 2-2a2 2 0 0 1-2-2a2 2 0 0 1-2 2zM9 18a6 6 0 0 1 6-6a6 6 0 0 1-6-6a6 6 0 0 1-6 6a6 6 0 0 1 6 6z"/>',
   viewprep: '<path d="M4 4h6v8H4zM14 4h6v4h-6zM14 12h6v8h-6zM4 16h6v4H4z"/>',
   closeout: '<path d="M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1-7 0a5 5 0 0 0-7 0zM5 21v-7"/>',
-  home: '<path d="M5 12H3l9-9l9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/><path d="M9 21v-6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"/>'
+  home: '<path d="M5 12H3l9-9l9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/><path d="M9 21v-6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"/>',
+  // CZ318: the flows' icons, from Hydra's shipped set (template/.hydra/resources/icons: network, timeline, wiki-w, coins)
+  assemble: '<rect x=16 y=16 width=6 height=6 rx=1 /><rect x=2 y=16 width=6 height=6 rx=1 /><rect x=9 y=2 width=6 height=6 rx=1 /><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
+  timeline: '<path d="M4 16l6 -7l5 5l5 -6"/><path d="M15 14m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M10 9m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M20 8m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>',
+  wikidata: '<text x=11.75 y=19 text-anchor=middle fill=currentColor stroke=none font-family="\'Linux Libertine\',\'Hoefler Text\',Georgia,\'Times New Roman\',serif" font-size=20>W</text>',
+  finance: '<path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/><circle cx=16 cy=8 r=6 />',
+  wiki: '<path d="M5 4m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M9 4m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M5 8h4"/><path d="M9 16h4"/><path d="M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041z"/><path d="M14 9l4 -1"/><path d="M16 16l3.923 -.98"/>'
 });
 Object.assign(SV, {      // Tabler Icons (MIT): the log's other verbs, the Tools and the finding levels
   Amended: '<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/>',
@@ -1113,8 +1301,9 @@ Object.assign(SV, {      // Tabler Icons (MIT): the log's other verbs, the Tools
   info: '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/>'
 });
 const STAGE_ICON = {ocr: 'ocr', text: 'text', catalogue: 'catalogue', check: 'check', analyse: 'analyse', read: 'read', escalate: 'Escalated', roster: 'roster', lag: 'lag', rate: 'rate', supervise: 'supervise',
-                    review: 'review', stubs: 'stubs', places: 'places', enrich: 'enrich', 'view-prep': 'viewprep', 'close-out': 'closeout'};
-const MODELS = [['Opus', 'claude-opus-5-5'], ['Sonnet', 'claude-sonnet-5-5'], ['Haiku', 'claude-haiku-5-5']];
+                    review: 'review', stubs: 'stubs', places: 'places', enrich: 'enrich', 'view-prep': 'viewprep', 'close-out': 'closeout',
+                    assemble: 'assemble', refine: 'review', timeline: 'timeline', wikidata: 'wikidata', finance: 'finance'};
+const MODELS = [['Haiku', 'claude-haiku-5-5'], ['Sonnet', 'claude-sonnet-5-5'], ['Opus', 'claude-opus-5-5']];   // bronze, silver, gold
 const LIMIT_TIPS = {
   parallel: 'How many pages the reader works on at the same time. More is faster, and puts more calls in flight at once.',
   calls: 'The most model calls one page may use. When the source is profiled, a page’s cap scales with its words, between a floor and a ceiling.',
@@ -1153,7 +1342,7 @@ function shellDetail(name) {
   const stage = (key, label, kind, extra = {}) => ({key, label, kind, about: '', role: null, model: kind === 'analyse' ? null : '-', budget: null, on: true, toggle: false, prompts: [], ...extra});
   const flow = k => SHELL_FLOWS[k].map(([label, who]) => ({label, who, note: '', per: 'once', role: who === 'code' ? undefined : who}));
   return withTools({name, flows: {analyse: flow('analyse'), read: flow('read')}, run: {source: null, pages: null, runner: 'Claude Code'}, agents: [],
-          stages: [stage('analyse', 'Analyse', 'analyse'), stage('read', 'Read', 'flow', {role: 'haiku'}), ...['Stubs', 'Places', 'Enrich'].map(l => stage(l.toLowerCase(), l, 'workflow'))],
+          stages: [stage('analyse', 'Analyse', 'analyse'), stage('read', 'Basic', 'flow', {role: 'haiku'}), ...['Stubs', 'Places', 'Enrich'].map(l => stage(l.toLowerCase(), l, 'workflow'))],
           limits: SHELL_LIMITS.map(([key, label]) => ({key, label, value: null})), prompts: [], authorized: [], lag: false});
 }
 function keepShape(name, d) {
@@ -1176,7 +1365,7 @@ async function openCfg(name, source) {
     state.cfg.on[s.key] = s.on;
   }
   state.cfg.on.lag = false;
-  state.cfg.on.after = store.get('apollo-after') !== '0';                 // Suggest links after a Read: on unless turned off (owner)
+  state.cfg.on.after = store.get('apollo-after') !== '0';                 // Assemble after a Basic run: on unless turned off (owner)
   layout();
   drawCfg();
   await loadCfg(source);
@@ -1209,6 +1398,7 @@ async function loadCfg(source) {
     }
     c.on.lag = !!c.on.lag;
     if (c.on.after === undefined) c.on.after = store.get('apollo-after') !== '0';
+    c.apFrom = c.apTo = '';                            // Assemble's pages: empty is every page read so far
     setError('cfg', null);
     drawCfg();
     loadStagePrompts();
@@ -1286,21 +1476,36 @@ const withTools = d => {                          // the Tools group: Analyse (f
 const isTool = st => !!st && (st.kind === 'analyse' || st.kind === 'tool' || st.kind === 'agent');
 // The flows, grouped by the domain they work in (owner: the real runs, not the tools; Analyse, OCR, Text and Catalogue run by
 // themselves when a Read starts). The manager sends the list (configs.flows); this is its shape until it answers.
+const ENGINE_FLOWS = ['assemble', 'refine', 'timeline', 'finance', 'wikidata', 'wiki', 'places'];      // apollo.py ENGINE_FLOWS: driven by pageflow/engine.py
 const FLOW_DEFS = [
-  {key: 'read', name: 'Read', domain: 'Records', needs: 'source', grades: {haiku: {default: 4, max: 12}, sonnet: {default: 1, max: 4}}},
-  {key: 'links', name: 'Links', domain: 'Graph', needs: 'archive', grades: {sonnet: {default: 1, max: 4}}},
-  {key: 'places', name: 'Places', domain: 'Geo', needs: 'archive', grades: {sonnet: {default: 1, max: 4}}},
-  {key: 'stubs', name: 'Stubs', domain: 'Profiles', needs: 'archive', grades: {sonnet: {default: 1, max: 4}}},
-  {key: 'enrich', name: 'Enrich', domain: 'Profiles', needs: 'archive', grades: {sonnet: {default: 1, max: 4}}}];
+  {key: 'read', name: 'Basic', domain: 'Records', needs: 'source', grades: {haiku: {default: 4, max: 12}, sonnet: {default: 1, max: 4}}},
+  {key: 'assemble', name: 'Assemble', domain: 'Graph', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 1}}},
+  {key: 'refine', name: 'Refine', domain: 'Graph', needs: 'archive', after: 'assemble', grades: {haiku: {default: 0, max: 1}, sonnet: {default: 0, max: 1}, opus: {default: 1, max: 1}}},
+  {key: 'timeline', name: 'Timeline', domain: 'Time', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
+  {key: 'places', name: 'Places', domain: 'Geo', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
+  {key: 'stubs', name: 'Stubs', domain: 'Profiles', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
+  {key: 'enrich', name: 'Enrich', domain: 'Profiles', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
+  {key: 'wikidata', name: 'Wikidata', domain: 'Profiles', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
+  {key: 'finance', name: 'Finance', domain: 'Finance', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
+  {key: 'wiki', name: 'Curate', domain: 'Curate', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}}];
 const flowDefs = () => (state.configs.flows && state.configs.flows.length ? state.configs.flows : FLOW_DEFS);
 const flowDef = k => flowDefs().find(f => f.key === k) || FLOW_DEFS[0];
+// A flow waits for the finished run of its `after` flow on the chosen archive; an archive that already holds records counts as done.
+function flowReady(f, c) {
+  if (!f.after) return true;
+  const p = archivePath(c);
+  if (p && p === draftPath() && ((state.configs.draft || {}).records || 0) > 0) return true;
+  return state.runs.some(r => r.archive === p && flowKey(r) === f.after && r.status === 'done');
+}
 function stageButtons(d, c) {
-  const btn = f => `<button type=button class=sb data-flow="${esc(f.key)}" aria-pressed=${f.key === c.flow}><span class=bi>${ic(f.key)}</span><span class=bl>${esc(f.name)}</span></button>`;
-  const domains = [...new Set(flowDefs().map(f => f.domain))];
-  return domains.map(dm => `<div class=sgp role=group aria-label="${esc(dm)}"><span class=gl>${esc(dm)}</span><div class=gb>${flowDefs().filter(f => f.domain === dm).map(btn).join('')}</div></div>`).join('');
+  return flowDefs().map(f => {
+    const ok = flowReady(f, c), need = ok ? '' : ` disabled title="Needs ${esc(flowDef(f.after).name)} first"`;
+    return `<button type=button class=sb data-flow="${esc(f.key)}" aria-pressed=${f.key === c.flow}${need}><span class=bi>${ic(f.key)}</span><span class=bl>${esc(f.name)}</span></button>`;
+  }).join('');
 }
 // Agents: how many of each grade the run sets off (bronze Haiku, silver Sonnet, gold Opus), only the grades the flow uses
 const GRADE_WORD = {haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus'};
+const GRADES = ['haiku', 'sonnet', 'opus'];             // the rank, bronze → silver → gold: every list of grades runs in this order (owner)
 function agentCounts(c) {
   const g = flowDef(c.flow).grades || {}, mine = (c.agents = c.agents || {})[c.flow] = (c.agents || {})[c.flow] || {};
   for (const [k, v] of Object.entries(g)) if (mine[k] == null) mine[k] = v.default;
@@ -1308,12 +1513,12 @@ function agentCounts(c) {
 }
 function agentsHTML(c) {
   const g = flowDef(c.flow).grades || {}, n = agentCounts(c);
-  const keys = Object.keys(g);
+  const keys = GRADES.filter(k => g[k]);                // the manager's map arrives in key order (haiku, opus, sonnet)
   if (!keys.length) return '';
   return `<div class=f><span>Agents</span><span class=grades>${keys.map(k => `<label class=gr1 title="${GRADE_WORD[k]}">${modelMark(k)}` +
     `<input class=n data-grade="${k}" value="${esc(n[k])}" inputmode=numeric aria-label="${GRADE_WORD[k]} agents"></label>`).join('')}</span></div>`;
 }
-const defaultCap = n => n > 11 ? Math.max(1, Math.min(5, Math.ceil(n * 0.045 / 0.5) * 0.5)) : 1;
+const defaultCap = n => state.set && state.set.limits && state.set.limits.run_usd != null ? state.set.limits.run_usd : n > 11 ?Math.max(1, Math.min(5, Math.ceil(n * 0.045 / 0.5) * 0.5)) : 1;
 const cfgPages = c => { const a = parseInt(c.from, 10), z = parseInt(c.to, 10); return a > 0 && z >= a ? z - a + 1 : 0; };
 const capText = c => c.capSet ? c.cap : String(defaultCap(cfgPages(c)));
 const draftPath = () => (state.configs.draft && state.configs.draft.path) || '';
@@ -1325,6 +1530,9 @@ function archiveOptions(c) {
   return opt('draft', 'Draft') + (c.flow === 'read' ? opt('new', 'New') : '') +
     rs.map(r => opt(r.archive, [runName(r), r.source_title].filter(Boolean).join(' · '))).join('');
 }
+// Answer questions: the session answers its own questions. On by default for Assemble, off for Wikidata; each flow keeps its own choice.
+const answerOn = c => { const v = store.get('apollo-answer-' + c.flow); return v == null ? c.flow === 'assemble' : v === '1'; };
+const answerSwitch = c => `<div class="f sw"><span>Answer questions</span><button type=button class="sw2${answerOn(c) ? ' on' : ''}" role=switch aria-checked=${answerOn(c)} aria-label="Answer questions" data-answer></button></div>`;
 function drawCfg() {
   const c = state.cfg, box = $('#cfgpanel');
   if (!c) return;
@@ -1338,11 +1546,16 @@ function drawCfg() {
   const srcs = state.configs.sources;
   const dis = c.shell ? ' disabled' : '';
   const read = c.flow === 'read';
-  const src = read ? `<label class=f><span>Source</span><select class=w id=cfgsrc${dis}>${srcs.map(s => `<option value="${esc(s.name)}"${s.name === c.source ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label>
-    <div class=f><span>Pages</span><span class=pp2><input id=cfgfrom value="${esc(c.from)}" inputmode=numeric aria-label="From page"${c.all || c.shell ? ' disabled' : ''}> – <input id=cfgto value="${esc(c.to)}" inputmode=numeric aria-label="To page"${c.all || c.shell ? ' disabled' : ''}><label class=allp><input type=checkbox id=cfgall${c.all ? ' checked' : ''}${dis}> All pages</label></span></div>` : '';
+  const srcSel = `<label class=f><span>Source</span><select class=w id=cfgsrc${dis}>${srcs.map(s => `<option value="${esc(s.name)}"${s.name === c.source ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label>`;
+  const asm = c.flow === 'assemble';
+  const eng = ENGINE_FLOWS.includes(c.flow);           // the engine flows read after a source's Basic run: its source and pages
+  const src = read ? srcSel + `
+    <div class=f><span>Pages</span><span class=pp2><input id=cfgfrom value="${esc(c.from)}" inputmode=numeric aria-label="From page"${c.all || c.shell ? ' disabled' : ''}> – <input id=cfgto value="${esc(c.to)}" inputmode=numeric aria-label="To page"${c.all || c.shell ? ' disabled' : ''}><label class=allp><input type=checkbox id=cfgall${c.all ? ' checked' : ''}${dis}> All pages</label></span></div>`
+    : eng ? srcSel + `<div class=f><span>Pages</span><span class=pp2 title="Empty: every page read so far"><input id=cfgafrom value="${esc(c.apFrom || '')}" inputmode=numeric placeholder=first aria-label="From page"${dis}> – <input id=cfgato value="${esc(c.apTo || '')}" inputmode=numeric placeholder=last aria-label="To page"${dis}></span></div>` : '';
+  const ans = asm || c.flow === 'wikidata' ? answerSwitch(c) : '';
   const run = `<div class=tqf>${src}
     <label class=f><span>Archive</span><select class=s12 id=cfgarch aria-label=Archive>${archiveOptions(c)}</select></label>
-    ${agentsHTML(c)}
+    ${agentsHTML(c)}${ans}
     <label class=f><span>Runner</span><select class=s9 disabled aria-label=Runner><option>${esc(d.run.runner)}</option></select></label></div>`;
   const capf = read ? `<div class=f><span class=lh>Cost cap<button type=button class=q aria-describedby=tt-cap aria-label="About the cost cap">?</button></span><span class=pp2>$<input class=n id=cfgcap value="${esc(capText(c))}" inputmode=decimal aria-label="Cost cap in dollars"${dis}></span><span class=tt id=tt-cap role=tooltip>The most this run may spend, in dollars. It finishes the page in hand, then closes and writes the report.</span></div>` : '';
   // Limits only for a Read with Limits on; the readers at once are the Agents field now
@@ -1496,8 +1709,10 @@ $('#cfgpanel').addEventListener('click', e => {
   if (cell) { showText('cfg', Number(cell.dataset.p)); return; }
   const mb = t.closest('[data-model]');
   if (mb) { c.models[mb.dataset.mrole] = mb.dataset.model; drawStage(); scheduleReady(c); return; }
+  const ab = t.closest('[data-answer]');
+  if (ab) { const on = !answerOn(c); store.set('apollo-answer-' + c.flow, on ? '1' : '0'); ab.classList.toggle('on', on); ab.setAttribute('aria-checked', String(on)); return; }
   const swb = t.closest('[data-switch]');
-  if (swb) { const k = swb.dataset.switch; c.on[k] = !c.on[k]; if (k === 'after') store.set('apollo-after', c.on.after ? '1' : '0'); drawStage(); scheduleReady(c); return; }
+  if (swb) { const k = swb.dataset.switch; c.on[k] = !c.on[k]; if (k === 'after') store.set('apollo-' + k, c.on[k] ? '1' : '0'); drawStage(); scheduleReady(c); return; }
   const pb = t.closest('[data-prompt]');
   if (pb) { c.pk[c.step] = pb.dataset.prompt; drawStage(); return; }
   const fb = t.closest('[data-step]');                 // a step of the Flow tab: its settings open under the buttons
@@ -1518,7 +1733,7 @@ $('#cfgpanel').addEventListener('change', e => {
   else if (e.target.id === 'cfglang') c.lang = e.target.value;
   else if (e.target.id === 'cfgdry') c.dry = e.target.checked;
   else if (e.target.id === 'cfglimits') { c.limits = e.target.checked; store.set('apollo-limits', c.limits ? '1' : '0'); drawCfg(); }  // limits
-  else if (e.target.id === 'cfgarch') { c.archive = e.target.value; scheduleReady(c); }
+  else if (e.target.id === 'cfgarch') { c.archive = e.target.value; $('#cfgpanel .sgs').innerHTML = stageButtons(c.detail, c); scheduleReady(c); }
   else if (e.target.id === 'cfgall') allPages(c, e.target.checked);
 });
 function syncCap(c) { const i = $('#cfgcap'); if (i && !c.capSet) i.value = capText(c); }
@@ -1550,6 +1765,7 @@ $('#cfgpanel').addEventListener('input', e => {
   if (!c) return;
   if (e.target.id === 'cfgfrom') { c.from = e.target.value.trim(); drawHeat(); syncCap(c); scheduleReady(c); }
   else if (e.target.id === 'cfgto') { c.to = e.target.value.trim(); drawHeat(); syncCap(c); scheduleReady(c); }
+  else if (e.target.id === 'cfgafrom' || e.target.id === 'cfgato') { c[e.target.id === 'cfgafrom' ? 'apFrom' : 'apTo'] = e.target.value.trim(); scheduleReady(c); }
   else if (e.target.id === 'cfgcap') { c.cap = e.target.value.trim(); c.capSet = c.cap !== ''; }
   else if (e.target.dataset.grade) {                 // Agents: a whole number, at most the flow's ceiling
     const g = e.target.dataset.grade, max = ((flowDef(c.flow).grades || {})[g] || {}).max || 12;
@@ -1659,11 +1875,18 @@ async function startFromCfg() {
   if (st.kind === 'tool') return runTool(c, st);
   if (st.kind === 'agent') { if (c.source) { state.cat[c.source] = {...(state.cat[c.source] || {ok: true, available: true}), job: {status: 'running'}}; catStart(c.source); drawGo(c, st); } return; }
   if (c.starting) return;
-  if (!c.dry && !(await confirmBox('Not dry: this run calls the models for real. Start it?', 'Start live'))) return;
+  // (owner, CZ313) Run starts on the click: no "are you sure" box
   const body = {dry: c.dry, flow: c.flow, agents: {...agentCounts(c)}};
   if (c.flow !== 'read') {
     if (!archivePath(c)) { setError('cfg', 'Start: no archive to work in yet.'); return; }
     Object.assign(body, {archive: c.archive === 'draft' ? 'draft' : c.archive, model: c.models[c.flow]});
+    if (c.flow === 'wikidata' && answerOn(c)) body.answer = true;
+    if (ENGINE_FLOWS.includes(c.flow)) {
+      if (c.source) body.source = c.source;
+      if (c.apFrom && c.apTo) body.pages = `${c.apFrom}-${c.apTo}`;
+      else if (c.apFrom || c.apTo) { setError('cfg', 'Start: pages are a first and a last page, or both empty.'); return; }
+      if (c.flow === 'assemble' && !answerOn(c)) body.no_answer = true;
+    }
   } else {
     const first = {};
     for (const s of c.detail.stages) if (s.role && !(s.role in first)) first[s.role] = s.model;
@@ -1671,7 +1894,7 @@ async function startFromCfg() {
     const without = [c.on.rate ? '' : 'rate', c.on.escalate ? '' : 'escalate'].filter(Boolean).join(',');
     const cap = parseFloat(capText(c));
     if (!(cap > 0)) { setError('cfg', 'Start: the cost cap is a number of dollars.'); return; }
-    Object.assign(body, {source: c.source, pages: c.from && c.to ? `${c.from}-${c.to}` : '', budget: String(cap), lag: !!c.on.lag, after: c.on.after ? 'links' : '', models, without,
+    Object.assign(body, {source: c.source, pages: c.from && c.to ? `${c.from}-${c.to}` : '', budget: String(cap), lag: !!c.on.lag, after: c.on.after ? 'assemble' : '', models, without,
                          archive: c.archive === 'draft' ? 'draft' : c.archive === 'new' ? 'new' : c.archive});
     if (c.limits === false) body.no_limits = true;  // limits
   }
@@ -1737,7 +1960,7 @@ $('#rerun').onclick = async () => {
 // Resume: carry a stopped page-flow run on from its saved state; nothing is cleared
 $('#resume').onclick = async () => {
   const s = state.byId[state.sel];
-  if (!s || !(await confirmBox('Resume this run from where it stopped?', 'Resume'))) return;
+  if (!s) return;                                           // (owner, CZ313) resumes on the click
   const b = $('#resume');
   b.disabled = true;
   try {
@@ -1810,7 +2033,7 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* no storage */ } },
 };
-const prefs = {theme: 'dune', mode: 'light', cost: false};            // mode: light | dark | system
+const prefs = {theme: 'dune', mode: 'light', cost: false, line: true};  // mode: light | dark | system; line: the scroll line
 const sysDark = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : {matches: false};
 function applyLook() {
   const t = THEMES.find(x => x.id === prefs.theme) || THEMES[0];
@@ -1852,57 +2075,19 @@ function setTheme(t) { prefs.theme = t; store.set('apollo-theme', t); applyLook(
 $('#mode').onclick = () => setMode(document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark');
 if (sysDark.addEventListener) sysDark.addEventListener('change', () => { if (prefs.mode === 'system') applyLook(); });
 
-function drawSettings() {
-  const sw = $('#swatches');
-  if (!sw.children.length) {
-    for (const t of THEMES) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'swatch'; b.dataset.theme = t.id;
-      const chip = document.createElement('i');
-      ['bg', 'accent', 'link'].forEach((k, n) => chip.style.setProperty('--sw-' + k, t.sw[n]));
-      b.append(chip, t.name);
-      b.onclick = () => setTheme(t.id);
-      sw.append(b);
-    }
-  }
-  for (const b of sw.children) b.setAttribute('aria-pressed', String(b.dataset.theme === prefs.theme));
-  const t = THEMES.find(x => x.id === prefs.theme) || THEMES[0], seg = $('#modeseg');
-  if (!seg.children.length) {
-    for (const [id, w] of [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']]) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.mode = id; b.textContent = w;
-      b.onclick = () => setMode(id);
-      seg.append(b);
-    }
-  }
-  for (const b of seg.children) {
-    b.setAttribute('aria-checked', String(b.dataset.mode === prefs.mode));
-    b.disabled = b.dataset.mode === 'dark' && !t.dark;
-  }
-  const cs = $('#costsw');
-  cs.classList.toggle('on', prefs.cost);
-  cs.setAttribute('aria-checked', String(prefs.cost));
-}
-function toggleSettings(open) {
-  const p = $('#settings');
-  p.hidden = open === undefined ? !p.hidden : !open;
-  $('#cog').setAttribute('aria-expanded', String(!p.hidden));
-  if (!p.hidden) p.querySelector('[aria-pressed=true]').focus(); else if (open === false) $('#cog').focus();
-}
-$('#costsw').onclick = () => setCost(!prefs.cost);
-$('#cog').onclick = e => { e.stopPropagation(); toggleSettings(); };
-document.addEventListener('click', e => {
-  if (!$('#settings').hidden && !e.target.closest('#settings')) toggleSettings(false);
-});
+// The cog opens the Settings page (settings.js, CZ330): theme, mode, scroll line and cost are its Appearance section.
+function drawSettings() { if (state.page === 'settings' && window.drawSettingsPage) drawSettingsPage(); }
+function setLine(on) { prefs.line = on; store.set('apollo-line', on ? '1' : '0'); document.body.classList.toggle('noline', !on); drawSettings(); }
+$('#cog').onclick = () => showPage('settings');
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (dismissToasts()) return;
   if (state.agentOpen) { state.agentOpen = null; agentRedraw(); return; }
-  if (!$('#settings').hidden) { toggleSettings(false); return; }
   if (document.querySelector('dialog[open]')) return;       // the dialog closes itself
   if (!$('#path').hidden) { $('#path').hidden = true; return; }
   if (state.openRow != null && state.tab === 'run') { state.openRow = null; drawLog(); return; }     // Esc folds the open row
+  if (state.q.sel && state.tab === 'questions') { state.q.sel = null; state.viewKey = ''; render(); return; }   // Esc deselects the question
   if (state.fnd.exp && state.tab === 'found') { state.fnd.exp = false; renderFound(state.foundView); return; }
   if (state.fnd.sel && state.tab === 'found') { state.fnd.sel = null; renderFound(state.foundView); return; }
   if (clearPick()) return;                                   // Esc clears the page filter a heatmap cell made
@@ -1911,6 +2096,7 @@ document.addEventListener('keydown', e => {
   if (state.cfg) { closeCfg(); return; }
   if (state.page === 'sources' && state.src.wiki.open) { toggleWiki(false); return; }
   if (window.etEsc && etEsc()) return;                       // entity trace: Esc deselects the entity, then the collection
+  if (state.page === 'settings' && window.setEsc && setEsc()) return;     // Settings: Esc closes the key field, then deselects the row
   if (state.page === 'sources' && state.src.sel) { selectSource(state.src.sel); return; }
   if (state.page) { state.page = null; layout(); return; }
   select(null);
@@ -1924,6 +2110,8 @@ function boot() {
   prefs.mode = ['light', 'dark', 'system'].includes(mode) ? mode : 'light';
   prefs.cost = store.get('apollo-cost') === '1';
   document.body.classList.toggle('nocost', !prefs.cost);
+  prefs.line = store.get('apollo-line') !== '0';
+  document.body.classList.toggle('noline', !prefs.line);
   applyLook();
   drawBar();
   setTab(hash.get('tab') || 'run');

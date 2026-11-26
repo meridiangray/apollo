@@ -28,6 +28,7 @@
 <script src=history.js defer></script>
 <script src=scrollline.js defer></script>
 <script src=chat.js defer></script>
+<script src=settings.js defer></script>
 </head>
 <body>
 <header class=bar>
@@ -43,7 +44,7 @@
   </nav>
   <span class=grow></span>
   <span id=who class="who unsigned" title="Runs are not signed"></span>
-  <button id=cog class=ib type=button title=Settings aria-label=Settings aria-haspopup=dialog aria-expanded=false aria-controls=settings>
+  <button id=cog class=ib type=button title=Settings aria-label=Settings aria-pressed=false>
     <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"/></svg>
   </button>
   <button id=mode class=ib type=button title="Light or dark" aria-label="Light or dark">
@@ -54,11 +55,6 @@
     <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg>
   </button>
 </header>
-<div id=settings class=pop role=dialog aria-label=Settings hidden>
-  <section><h3>Theme</h3><div id=swatches class=swatches></div></section>
-  <section><h3>Mode</h3><div id=modeseg class=seg role=radiogroup aria-label=Mode></div></section>
-  <section class=swrow><h3>Show cost</h3><button id=costsw class=sw2 type=button role=switch aria-checked=false aria-label="Show cost"></button></section>
-</div>
 <main class="wrap one" id=wrap>
   <section class="panel runs">
     <h2>Runs <small id=nruns></small></h2>
@@ -87,6 +83,7 @@
       <button type=button role=tab data-tab=found>Found <small></small></button>
       <button type=button role=tab data-tab=questions>Questions <small></small></button>
       <button type=button role=tab data-tab=calls>Calls <small></small></button>
+      <button type=button role=tab data-tab=runs>Runs <small></small></button>
       <button type=button role=tab data-tab=raw>Raw</button>
       <button type=button role=tab data-tab=report>Report</button>
       <button type=button role=tab data-tab=data>Data</button>
@@ -98,6 +95,7 @@
   <section class="panel cfg srcp" id=srcpanel></section>
   <section class="panel cfg colp" id=colpanel></section>
   <section class="panel cfg hisp" id=hispanel></section>
+  <section class="panel cfg setp" id=setpanel></section>
 </main>
 
 <dialog id=confirmdlg>

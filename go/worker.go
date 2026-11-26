@@ -25,7 +25,7 @@ type worker struct {
 // cache, and the worker already holds the driver's imports). Starting, stopping and clearing keep their own process.
 var workerCalls = map[string]bool{"ls": true, "status": true, "view": true, "configs": true, "recipe": true,
 	"prompt": true, "tail": true, "analyse": true, "toolget": true, "toolabout": true, "sourcelist": true, "pagetext": true, "collections": true, "entitytrace": true,
-	"proofreadget": true, "catalogueget": true, "catalogueexport": true, "history": true, "logdb": true, "choices": true, "pageview": true}
+	"proofreadget": true, "catalogueget": true, "catalogueexport": true, "history": true, "logdb": true, "choices": true, "pageview": true, "settings": true}
 
 func (w *worker) start() error {
 	cmd := exec.Command(w.argv[0], w.argv[1:]...)

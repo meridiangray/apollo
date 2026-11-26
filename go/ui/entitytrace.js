@@ -65,6 +65,7 @@ function etCard() {
   add('Type', esc(schemaWord(e.schema || info.schema)));
   add('Record', e.id ? `<code>${esc(e.id)}</code>` : '');
   add('Collection', esc(info.collection_title || e.collTitle || e.collection || ''));
+  add('Source', esc(e.source || ''));                        // set only in a Complex Collection, which spans several
   return `<h3 class=rh>Selected</h3><div class=selcard><table class=infobox><caption><span class=selname>${entityIcon(e.schema || info.schema)}<span>${esc(e.name)}</span></span></caption>${rows.join('')}</table>${etTrace(t)}</div>`;
 }
 function etList(surface, ents, archive, coll) {
@@ -108,6 +109,7 @@ async function etSourceLoad(slug, title) {
   try {
     const got = await api(`/api/entitytrace?archive=${encodeURIComponent(arch)}&source=${encodeURIComponent(slug)}&title=${encodeURIComponent(title || '')}`);
     s.ents = got.entities || [];
+    s.lanes = got.lanes || {};                                 // {run id: {page: n}}: what each run after Read touched per page (Sources' lanes)
   } catch (e) {
     s.at = 0;
     notify('error', `Trace: ${e.message}`);
@@ -122,6 +124,7 @@ const etSourceRail = r => {
 function etEsc() {
   if (state.page !== 'sources' && state.page !== 'collections') return false;
   if (state.et.sel) { state.et.sel = null; etRedraw(); return true; }
+  if (window.colEsc && colEsc()) return true;                // the picked collections
   if (state.page === 'collections' && state.col.sel) { state.col.sel = null; etRedraw(); return true; }
   return false;
 }
@@ -129,8 +132,10 @@ document.addEventListener('click', e => {
   const row = e.target.closest('.erow[data-ei]');
   if (row) {
     const l = state.et.lists[row.dataset.es], ent = l && l.ents[+row.dataset.ei];
+    const cx = l && l.coll && l.coll.complex;                  // a Complex Collection's thing: its own collection and its source
+    const own = cx && ent ? l.coll.members.find(m => m.name === ent.collection) : null;
     if (ent) etSelect({id: ent.id || null, name: ent.name, schema: ent.schema, collection: ent.collection || (l.coll && l.coll.name) || null,
-      collTitle: l.coll ? l.coll.title : null, archive: l.archive});
+      collTitle: own ? own.title : l.coll && !cx ? l.coll.title : null, source: cx ? ent.source || (own ? colSource(own) : null) : null, archive: l.archive});
     return;
   }
   const f = e.target.closest('[data-tf]');

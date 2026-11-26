@@ -686,7 +686,7 @@ def get(source: str) -> dict:
     av = available(pdf)
     acc, pen = accepted(source), pending(source)
     return {"ok": True, "available": av["ok"], "why": av["why"], "pdf": pdf, "max_pages": MAX_PAGES,
-            "fields": [{"key": k, "tag": t, "name": n} for k, t, n in FIELDS], "job": _job(source), "pending": pen, "accepted": acc,
+            "fields": [{"key": k, "tag": t, "name": n, "kinds": list(KINDS.get(k, ()))} for k, t, n in FIELDS], "job": _job(source), "pending": pen, "accepted": acc,
             "check": check(source, (pen or acc or {}).get("record") or []) if (pen or acc) else []}
 
 
@@ -742,13 +742,51 @@ def edit(source: str, index: int, value: str, pending: bool = False) -> dict:
     items = list(rec.get("record") or [])
     if not isinstance(index, int) or not 0 <= index < len(items):
         raise ValueError("no such field")
-    text = "\n".join(" ".join(ln.split()) for ln in str(value or "").splitlines()).strip()
-    if len(text) > 1500:
-        raise ValueError("at most 1500 characters")
+    text = _text(items[index]["key"], items[index].get("kind") or "", value)
     if text:
         items[index] = {**{k: v for k, v in items[index].items() if k != "rejected"}, "value": text, "edited": True}
     else:
         del items[index]
+    name = f"{source}.pending.json" if pending else f"{source}.json"
+    _write(folder() / name, {**rec, "record": items, "edited": datetime.now().isoformat(timespec="seconds")})
+    return {"ok": True, "source": source}
+
+
+def _text(key: str, kind: str, value) -> str:
+    """A field's text as the record keeps it: lines trimmed, at most 1500 characters, a date as YYYY, YYYY-MM or YYYY-MM-DD."""
+    text = "\n".join(" ".join(ln.split()) for ln in str(value or "").splitlines()).strip()
+    if len(text) > 1500:
+        raise ValueError("at most 1500 characters")
+    if text and kind == "date" and key in ("imprint", "declass"):
+        m = re.fullmatch(r"(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?", text)
+        try:
+            if not m:
+                raise ValueError
+            datetime(int(m[1]), int(m[2] or 1), int(m[3] or 1))
+        except ValueError:
+            raise ValueError("a date is YYYY, YYYY-MM or YYYY-MM-DD") from None
+    return text
+
+
+def add(source: str, key: str, kind: str, value: str, pending: bool = False) -> dict:
+    """Add a field (key, kind, text) to the accepted record, or to the one waiting for Accept (`pending`), marked edited as a hand edit is.
+    A field of that key and kind that is already there is an error, unless it is a rejected waiting one, which the new text replaces."""
+    _slug(source)
+    rec = globals()["pending"](source) if pending else accepted(source)
+    if not rec:
+        raise ValueError("nothing is waiting to add to" if pending else "no accepted record to add to")
+    kind = kind or ""
+    if key not in KEYS:
+        raise ValueError(f"no such field; one of {', '.join(KEYS)}")
+    if key != "identifier" and kind not in KINDS.get(key, ("",)) + ("",) or len(kind) > 40:
+        raise ValueError("no such kind of that field")
+    text = _text(key, kind, value)
+    if not text:
+        raise ValueError("give the field's text")
+    items = [i for i in rec.get("record") or [] if not (i["key"] == key and (i.get("kind") or "") == kind and i.get("rejected"))]
+    if any(i["key"] == key and (i.get("kind") or "") == kind for i in items):
+        raise ValueError("that field is already there")
+    items = sorted(items + [{"key": key, "kind": kind, "value": text, "page": None, "edited": True}], key=_order)
     name = f"{source}.pending.json" if pending else f"{source}.json"
     _write(folder() / name, {**rec, "record": items, "edited": datetime.now().isoformat(timespec="seconds")})
     return {"ok": True, "source": source}

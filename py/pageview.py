@@ -324,10 +324,18 @@ def _group(rows: list[dict], key: str) -> list[dict]:
 
 def _minted(files) -> dict:
     """{working id: minted id}: the page flow saves minted ids (`<run>/pageflow/minted.json`, hydra's api/mint.py) and keeps its own
-    working ids (p37-t1) inside the run; a run from before minting has none."""
-    got = read_json(files.pf / "minted.json", {}) or {}
-    ids = got.get("ids") if isinstance(got, dict) else None
-    return {str(k): str(v) for k, v in (ids or {}).items()}
+    working ids (p37-t1) inside the run. A run from before minting has none: its working ids were moved by hydra's upgrade step
+    "Re-mint bespoke ids", which keeps the same map in `<archive>/.hydra/reminted.json`; the run's own map wins."""
+    out = {}
+    try:
+        root = files.archive()
+    except Exception:
+        root = None
+    for path in ([Path(root) / ".hydra" / "reminted.json"] if root else []) + [files.pf / "minted.json"]:
+        got = read_json(path, {}) or {}
+        ids = got.get("ids") if isinstance(got, dict) else None
+        out.update({str(k): str(v) for k, v in (ids or {}).items()})
+    return out
 
 
 def _roster(files) -> dict:

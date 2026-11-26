@@ -58,3 +58,30 @@ func (s *Server) catalogueMark(w http.ResponseWriter, r *http.Request) {
 	s.cache.clear()
 	s.outcome(w, raw, err)
 }
+
+// catalogueAdd adds one field ({source, key, kind, value}) to the accepted record, or to the record waiting for Accept
+// ({pending: true}). The manager checks the key, the kind and a date's form.
+func (s *Server) catalogueAdd(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Source  string `json:"source"`
+		Key     string `json:"key"`
+		Kind    string `json:"kind"`
+		Value   string `json:"value"`
+		Pending bool   `json:"pending"`
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<15))
+	if err == nil {
+		err = json.Unmarshal(body, &req)
+	}
+	if err != nil || !reSlug.MatchString(req.Source) || !reSlug.MatchString(req.Key) {
+		fail(w, http.StatusBadRequest, "a JSON body: source, key, kind, value")
+		return
+	}
+	args := []string{"catalogueadd", "--source", req.Source, "--key", req.Key, "--kind=" + req.Kind, "--value=" + req.Value}
+	if req.Pending {
+		args = append(args, "--pending")
+	}
+	raw, err := s.Backend.Call(context.WithoutCancel(r.Context()), 30*time.Second, args...)
+	s.cache.clear()
+	s.outcome(w, raw, err)
+}

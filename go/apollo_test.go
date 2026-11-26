@@ -604,9 +604,34 @@ func TestStartArgsFlow(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(args, []string{"start", "--flow", "stubs", "--json", "--archive", "/mnt/e/a/archives/r/x"}) {
 		t.Fatalf("%v %v", args, err)
 	}
-	for _, bad := range []StartRequest{{Flow: "read"}, {Flow: "stubs"}, {Flow: "-x", Source: "p"}, {Flow: "read", Source: "p", Archive: "--x"}} {
+	args, err = StartArgs("linux", StartRequest{Flow: "wikidata", Archive: "/a/x", Answer: true})
+	if err != nil || !reflect.DeepEqual(args, []string{"start", "--flow", "wikidata", "--json", "--answer", "--archive", "/a/x"}) {
+		t.Fatalf("%v %v", args, err)
+	}
+	args, err = StartArgs("linux", StartRequest{Flow: "read", Source: "p", After: "assemble"})
+	if err != nil || !reflect.DeepEqual(args, []string{"start", "--flow", "read", "--source", "p", "--json", "--after", "assemble"}) {
+		t.Fatalf("%v %v", args, err)
+	}
+	for _, bad := range []StartRequest{{Flow: "read"}, {Flow: "stubs"}, {Flow: "-x", Source: "p"}, {Flow: "read", Source: "p", Archive: "--x"},
+		{Flow: "read", Source: "p", After: "links"}, {Flow: "stubs", Archive: "/a/x", Answer: true},
+		{Flow: "wikidata", Archive: "/a/x", NoAnswer: true}, {Flow: "assemble", Archive: "/a/x", Answer: true, NoAnswer: true},
+		{Flow: "assemble", Archive: "/a/x", Source: "-x"}, {Flow: "assemble", Archive: "/a/x", Pages: "1-x"}} {
 		if _, err := StartArgs("linux", bad); err == nil {
 			t.Errorf("%+v must fail", bad)
+		}
+	}
+	args, err = StartArgs("linux", StartRequest{Flow: "assemble", Archive: "/a/x", Source: "tarbell", Pages: "5-40", NoAnswer: true})
+	if err != nil || !reflect.DeepEqual(args, []string{"start", "--flow", "assemble", "--json", "--no-answer", "--source", "tarbell", "--archive", "/a/x", "--pages", "5-40"}) {
+		t.Fatalf("%v %v", args, err)
+	}
+	args, err = StartArgs("linux", StartRequest{Flow: "assemble", Archive: "/a/x", Answer: true})
+	if err != nil || !reflect.DeepEqual(args, []string{"start", "--flow", "assemble", "--json", "--answer", "--archive", "/a/x"}) {
+		t.Fatalf("%v %v", args, err)
+	}
+	for _, f := range []string{"refine", "timeline"} { // the engine flows take the source their Basic run read
+		args, err = StartArgs("linux", StartRequest{Flow: f, Archive: "/a/x", Source: "tarbell", Pages: "36-50"})
+		if err != nil || !reflect.DeepEqual(args, []string{"start", "--flow", f, "--json", "--source", "tarbell", "--archive", "/a/x", "--pages", "36-50"}) {
+			t.Fatalf("%s: %v %v", f, args, err)
 		}
 	}
 }
@@ -698,6 +723,31 @@ func TestSourceEditsAndReadsGoToTheManager(t *testing.T) {
 	}
 	if w := do(h, "GET", "/api/collections?archive=--x", host, nil, ""); w.Code != 400 {
 		t.Errorf("collections archive: %d", w.Code)
+	}
+}
+
+// a Complex Collection: a group's records by ?group=, and the group made from two collections or more
+func TestComplexCollectionArgs(t *testing.T) {
+	s, rec := testServer(t, map[string]string{"collections": `{"ok": true, "records": []}`,
+		"collectiongroup": `{"ok": true, "name": "a-b", "title": "A · B", "collections": ["a-x", "b-y"]}`})
+	h, host, hdr := s.Handler(), "127.0.0.1:8787", map[string]string{tokenHeader: s.Token}
+	if w := do(h, "GET", "/api/collections?archive=/a/b&group=a-b&offset=0", host, nil, ""); w.Code != 200 {
+		t.Fatalf("group: %d", w.Code)
+	}
+	if last := rec.calls[len(rec.calls)-1]; !reflect.DeepEqual(last[2:], []string{"collections", "/a/b", "--group", "a-b", "--offset", "0"}) {
+		t.Fatalf("%q", last)
+	}
+	if w := do(h, "POST", "/api/collections/group", host, hdr, `{"archive":"/a/b","title":"A · B","collections":["a-x","b-y"]}`); w.Code != 200 {
+		t.Fatalf("make: %d %s", w.Code, w.Body)
+	}
+	if last := rec.calls[len(rec.calls)-1]; !reflect.DeepEqual(last[2:], []string{"collectiongroup", "/a/b", "--title=A · B", "--collections=a-x,b-y"}) {
+		t.Fatalf("%q", last)
+	}
+	for _, bad := range []string{`{"archive":"/a/b","title":"T","collections":["a-x"]}`, `{"archive":"/a/b","title":"","collections":["a","b"]}`,
+		`{"archive":"-x","title":"T","collections":["a","b"]}`, `{"archive":"/a/b","title":"T","collections":["a","../b"]}`, `nonsense`} {
+		if w := do(h, "POST", "/api/collections/group", host, hdr, bad); w.Code != 400 {
+			t.Errorf("%s: %d", bad, w.Code)
+		}
 	}
 }
 
@@ -799,6 +849,32 @@ func TestStartArgsAgents(t *testing.T) {
 	for _, bad := range []StartRequest{{Flow: "read", Source: "p", Agents: map[string]int{"gpt": 1}}, {Flow: "read", Source: "p", Agents: map[string]int{"haiku": -1}}} {
 		if _, err := StartArgs("linux", bad); err == nil {
 			t.Fatalf("accepted %v", bad)
+		}
+	}
+}
+
+func TestComplexCollectionEditArgs(t *testing.T) {
+	s, rec := testServer(t, map[string]string{"collectiongroupedit": `{"ok": true, "name": "a-b", "title": "New", "collections": ["a-x", "b-y"]}`})
+	h, host, hdr := s.Handler(), "127.0.0.1:8787", map[string]string{tokenHeader: s.Token}
+	for body, want := range map[string][]string{
+		`{"archive":"/a/b","key":"a-b","title":"New"}`:                    {"--key=a-b", "--title=New"},
+		`{"archive":"/a/b","key":"a-b"}`:                                  {"--key=a-b"},
+		`{"archive":"/a/b","key":"a-b","collections":["a-x","b-y","c-z"]}`: {"--key=a-b", "--collections=a-x,b-y,c-z"},
+	} {
+		if w := do(h, "POST", "/api/collections/group/edit", host, hdr, body); w.Code != 200 {
+			t.Fatalf("%s: %d %s", body, w.Code, w.Body)
+		}
+		if last := rec.calls[len(rec.calls)-1]; !reflect.DeepEqual(last[2:], append([]string{"collectiongroupedit", "/a/b"}, want...)) {
+			t.Fatalf("%q", last)
+		}
+	}
+	if w := do(h, "POST", "/api/collections/group/edit", host, nil, `{"archive":"/a/b","key":"a-b"}`); w.Code == 200 {
+		t.Errorf("no token: %d", w.Code)
+	}
+	for _, bad := range []string{`{"archive":"/a/b","key":"a-b","title":" "}`, `{"archive":"-x","key":"a-b"}`, `{"archive":"/a/b","key":"../b"}`,
+		`{"archive":"/a/b","key":"a-b","collections":["a"]}`, `nonsense`} {
+		if w := do(h, "POST", "/api/collections/group/edit", host, hdr, bad); w.Code != 400 {
+			t.Errorf("%s: %d", bad, w.Code)
 		}
 	}
 }

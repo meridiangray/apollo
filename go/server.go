@@ -84,6 +84,7 @@ type Server struct {
 	Quit    func()
 	page    []byte
 	cache   *cache
+	groupMu sync.Mutex // one collection-group change at a time: each rebuilds the archive from the files it started with
 }
 
 func NewToken() string {
@@ -203,15 +204,22 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/catalogue/edit", s.catalogueEdit) // tool args
 	mux.HandleFunc("POST /api/brief/generate", s.briefGenerate)
 	mux.HandleFunc("POST /api/catalogue/mark", s.catalogueMark)
+	mux.HandleFunc("POST /api/catalogue/add", s.catalogueAdd)
 	mux.HandleFunc("GET /api/catalogue/export", s.catalogueExport)
 	mux.HandleFunc("GET /api/history", s.history)
+	mux.HandleFunc("GET /api/settings", s.settingsGet)   // settings
+	mux.HandleFunc("POST /api/settings", s.settingsPost) // settings
+	mux.Handle("GET /settings.js", files)                 // settings
 	mux.HandleFunc("POST /api/logdb", s.logdb)
 	mux.HandleFunc("GET /api/collections", s.collections)
+	mux.HandleFunc("POST /api/collections/group", s.collectionGroup) // a Complex Collection
+	mux.HandleFunc("POST /api/collections/group/edit", s.collectionGroupEdit) // rename or ungroup a Complex Collection
 	mux.HandleFunc("GET /api/entitytrace", s.entitytrace) // entity trace
 	mux.Handle("GET /entitytrace.js", files)              // entity trace
 	mux.Handle("GET /pageview.js", files)                 // pageview
 	mux.HandleFunc("GET /api/pageview", s.pageview)       // pageview
 	mux.HandleFunc("POST /api/export/{id}", s.export)     // export
+	mux.HandleFunc("POST /api/answer/{id}", s.answer)     // answering
 	s.chatRoutes(mux, files)                              // chat: /chat.js, /chat.css, /api/chat
 	mux.HandleFunc("GET /api/ping", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"app": "apollo"})

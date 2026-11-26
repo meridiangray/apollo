@@ -13,44 +13,62 @@ from pathlib import Path
 from runfiles import PLACE_SCHEMAS, SKIPPED, _text_of, fold, run_rows, short_tool
 
 # What a run does, as the window's Flow select names it: key, label. `read` is the page flow; the rest are hydra workflows.
-FLOWS = [("read", "Read"), ("links", "Links"), ("places", "Places"), ("stubs", "Stubs"), ("enrich", "Enrich"), ("wiki", "Wiki")]   # Records, Graph, Geo, Profiles, Wiki
+FLOWS = [("read", "Basic"), ("assemble", "Assemble"), ("refine", "Refine"), ("timeline", "Timeline"), ("places", "Places"), ("stubs", "Stubs"),
+         ("enrich", "Enrich"), ("wikidata", "Wikidata"), ("finance", "Finance"), ("wiki", "Curate")]
 FLOW_LABEL = dict(FLOWS)
-FLOW_DOMAIN = {"read": "Records", "links": "Graph", "places": "Geo", "stubs": "Profiles", "enrich": "Profiles", "wiki": "Wiki"}
+FLOW_DOMAIN = {"read": "Records", "assemble": "Graph", "refine": "Graph", "timeline": "Time", "places": "Geo", "stubs": "Profiles",
+               "enrich": "Profiles", "wikidata": "Profiles", "finance": "Finance", "wiki": "Curate"}
+# a flow renamed: its old runs show as the new one (2026-11-26: Links became Wikidata; its merges went to Assemble)
+RENAMED = {"links": "wikidata"}
 # the names runs were recorded under before the one-word ones: an old record's `flow` may hold either
-OLD_LABELS = {"Read the source": "read", "Suggest links": "links", "Place names": "places", "Fill stubs": "stubs"}
+OLD_LABELS = {"Read the source": "read", "Read": "read", "Wiki": "wiki", "Suggest links": "wikidata", "Links": "wikidata", "Place names": "places",
+              "Fill stubs": "stubs"}
 GRADES = ("haiku", "sonnet", "opus")
-# What New run offers per flow: needs, and the model grades the flow can use with their {default, max} agent counts.
+# What New run offers per flow: needs, `after` (the flow whose finished run on the archive it waits for), and the model grades the flow can use with their {default, max} agent counts.
 # Read (the page flow): Haiku readers work pages at once, Sonnet agents work the hard pages at once; no Opus role.
 # A workflow is one Claude Code session; a count is the agents of that grade (the session itself is one of its own grade),
-# the others are sub-agents it may dispatch in parallel. Links is one sweep call: nothing to spread.
+# the others are sub-agents it may dispatch in parallel. Assemble is one call of code then judgement: nothing to spread.
+_SESSION = {"haiku": {"default": 0, "max": 4}, "sonnet": {"default": 1, "max": 4}, "opus": {"default": 0, "max": 2}}
+# An engine flow (pageflow/engine.py) judges with one model: the person picks its grade (the strongest given an agent).
+_ENGINE = {"haiku": {"default": 0, "max": 1}, "sonnet": {"default": 1, "max": 1}, "opus": {"default": 0, "max": 1}}
 FLOW_SPEC = {
     "read": {"needs": "source", "grades": {"haiku": {"default": 4, "max": 8}, "sonnet": {"default": 2, "max": 4}}},
-    "links": {"needs": "archive", "grades": {"sonnet": {"default": 1, "max": 1}}},
-    "places": {"needs": "archive", "grades": {"haiku": {"default": 0, "max": 4}, "sonnet": {"default": 1, "max": 4}, "opus": {"default": 0, "max": 2}}},
-    "stubs": {"needs": "archive", "grades": {"haiku": {"default": 0, "max": 4}, "sonnet": {"default": 1, "max": 4}, "opus": {"default": 0, "max": 2}}},
-    "enrich": {"needs": "archive", "grades": {"haiku": {"default": 0, "max": 4}, "sonnet": {"default": 1, "max": 4}, "opus": {"default": 0, "max": 2}}},
-    "wiki": {"needs": "archive", "grades": {"haiku": {"default": 0, "max": 4}, "sonnet": {"default": 1, "max": 4}, "opus": {"default": 0, "max": 2}}},
+    **{k: {"needs": "archive", "after": "read", "grades": dict(_ENGINE)} for k in ("assemble", "timeline", "finance", "wikidata", "places",
+                                                                                  "wiki")},
+    # Refine: a final review of the finished set, Opus unless the person picks another grade
+    "refine": {"needs": "archive", "after": "assemble", "grades": {**_ENGINE, "sonnet": {"default": 0, "max": 1},
+                                                                   "opus": {"default": 1, "max": 1}}},
+    **{k: {"needs": "archive", "after": "read", "grades": dict(_SESSION)} for k in ("stubs", "enrich")},
 }
+
+
+def flow_grades(flow: str) -> dict:
+    """A flow's grades as FLOW_SPEC gives them, each default replaced by the Settings page's (apollo.json), kept in bounds."""
+    import settings
+    low = 1 if flow == "read" else 0
+    return {g: {**lim, "default": min(lim["max"], max(low, settings.value(f"agents.{flow}.{g}", lim["default"])))}
+            for g, lim in ((FLOW_SPEC.get(flow) or {}).get("grades") or {}).items()}
 
 
 def flow_catalogue() -> list[dict]:
     """The flows New run lists, in the order of their domains: key, name (and `label`, the same), domain, needs, grades."""
-    return [{"key": k, "name": name, "label": name, "domain": FLOW_DOMAIN[k], "needs": FLOW_SPEC[k]["needs"],
-             "grades": FLOW_SPEC[k]["grades"]} for k, name in FLOWS]
+    return [{"key": k, "name": name, "label": name, "domain": FLOW_DOMAIN[k], "needs": FLOW_SPEC[k]["needs"], "after": FLOW_SPEC[k].get("after"),
+             "grades": flow_grades(k)} for k, name in FLOWS]
 
 
 def flow_key(rec: dict) -> str | None:
-    """A run's flow as its key (read, links, places, stubs, enrich, wiki). Old records: a page flow is a read, a workflow session
+    """A run's flow as its key (see FLOWS). Old records: a page flow is a read, a renamed flow its new key, a workflow session
     is named by its workflow or its `workflow-<key>` name, and an old display name maps back; a brief session has none."""
     f = rec.get("flow")
     if f in FLOW_LABEL:
         return f
+    if f in RENAMED:
+        return RENAMED[f]
     if f in OLD_LABELS:
         return OLD_LABELS[f]
-    if f in OLD_LABELS.values():
-        return f
     nm = str(rec.get("name") or "")
     name = rec.get("workflow") or (nm.removeprefix("workflow-") if nm.startswith("workflow-") else "")
+    name = RENAMED.get(name, name)
     if name in FLOW_LABEL:
         return name
     return "read" if rec.get("kind") == "pageflow" else None
@@ -605,15 +623,71 @@ def transcript_rows(events: list[dict], limit: int = 400) -> list[dict]:
     return out[-limit:]
 
 
+def call_row(c: dict) -> dict:
+    """One archive call row for the Calls tab: {at, tool, ms, ok, args, text, step, note}. `note` (what the call did: did,
+    counts, refs, refs_more, lint) is kept only when hydra wrote one; `step` is the task step's text, else None."""
+    n = c.get("_note") if isinstance(c.get("_note"), dict) else None
+    step = (n or {}).get("step") or c.get("_step")
+    out = {"at": c.get("_stamp"), "tool": c.get("tool"), "ms": c.get("ms"), "ok": c.get("ok", True),
+           "args": json.dumps(c.get("_args") or {}, ensure_ascii=False)[:600], "text": str(c.get("error") or "")[:600],
+           "step": step if isinstance(step, str) and step else None}
+    if n:
+        out["note"] = {k: n[k] for k in ("did", "counts", "refs", "refs_more", "lint") if n.get(k)}
+    return out
+
+
+def _name_note_ids(rows: list[dict], archive) -> None:
+    """Say each record id a note names (refs, lint) by name: `names` {id: name} on the row, only for ids the archive knows."""
+    ids = {i for r in rows for i in [*((r.get("note") or {}).get("refs") or []),
+                                     *(x.get("id") for x in (r.get("note") or {}).get("lint") or [] if isinstance(x, dict))] if isinstance(i, str)}
+    if not ids:
+        return
+    names, where = archive_names(archive), _record_homes(archive)
+    for r in rows:
+        n = r.get("note")
+        if not n:
+            continue
+        mine = {*(n.get("refs") or []), *(x.get("id") for x in n.get("lint") or [] if isinstance(x, dict))}
+        got = {i: {"name": names[i], **where.get(i, {})} for i in mine if isinstance(i, str) and i in names}
+        if got:
+            n["recs"] = got
+
+
+_HOMES_MEMO: dict = {}
+
+
+def _record_homes(archive) -> dict:
+    """{record id: {col: the collection it is kept in, schema}}, read again only when a collection file changes."""
+    root = Path(str(archive or ""))
+    files = sorted((root / "collections").glob("*.json")) if root.is_dir() else []
+    key = (str(root), tuple((f.name, f.stat().st_mtime_ns) for f in files))
+    if _HOMES_MEMO.get("key") != key:
+        homes = {}
+        for f in files:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for r in data if isinstance(data, list) else data.get("records") or []:
+                if isinstance(r, dict) and r.get("id"):
+                    homes[r["id"]] = {"col": f.stem, "schema": r.get("schema") or ""}
+        _HOMES_MEMO.update(key=key, homes=homes)
+    return _HOMES_MEMO["homes"]
+
+
 def raw_view(files, kind: str) -> dict:
     """{driver: [line], hydra: [{at, tool, ms, ok, args, text}], models: [{n, at, model, label, ms, ok, tokens, prompt_chars,
     answer_chars, why}], transcript: [{n, type, text}]}: the tails of the run's own files."""
     hy = [{"at": r.get("at"), "tool": r.get("tool"), "ms": r.get("ms"), "ok": r.get("ok", True),
            "args": json.dumps(r.get("args") or {}, ensure_ascii=False)[:600], "text": str(r.get("text") or "")[:600]}
           for r in files.hydra_rows()[-600:]]
-    ms = [{"n": m.get("n") or j + 1, "at": m.get("at"), "model": m.get("model"), "label": m.get("label"), "ms": m.get("ms"),
+    if kind != "pageflow":                                   # an agent session: hydra's own call log of the archive, with its notes
+        hy = [call_row(c) for c in files.mcp_rows()[-600:]]
+        _name_note_ids(hy, files.archive())
+    ms =[{"n": m.get("n") or j + 1, "at": m.get("at"), "model": m.get("model"), "label": m.get("label"), "ms": m.get("ms"),
            "ok": m.get("ok", True), "tokens": m.get("tokens"), "prompt_chars": m.get("prompt_chars"),
            "answer_chars": None if m.get("answer") is None else len(str(m["answer"])), "why": m.get("why")}
           for j, m in enumerate(files.models())][-600:]
-    return {"driver": files.driver_log(300) if kind == "pageflow" else [], "hydra": hy, "models": ms,
+    return {"archive": files.archive() if kind != "pageflow" else None,
+            "driver": files.driver_log(300) if kind == "pageflow" else [], "hydra": hy, "models": ms,
             "transcript": transcript_rows(files.transcript_events()) if kind != "pageflow" else []}

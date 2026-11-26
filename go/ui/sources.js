@@ -132,7 +132,8 @@ function sourceFound(ents) {
   const shown = state.src.ftype ? ents.filter(e => e.schema === state.src.ftype) : ents;
   const chips = kinds.length > 1 ? `<div class=fchips role=group aria-label=Kind><button type=button class=fc data-sft="" aria-pressed=${!state.src.ftype}>All <b>${ents.length}</b></button>` +
     kinds.map(k => `<button type=button class=fc data-sft="${esc(k)}" aria-pressed=${state.src.ftype === k}>${entityIcon(k)}${esc(schemaWord(k))} <b>${ents.filter(e => e.schema === k).length}</b></button>`).join('') + '</div>' : '';
-  return `${chips}<div class=srcart><div class=srcmain>${etList('src', shown, draftPath(), null)}</div><aside class="side portrait" id=portrait aria-label=Selected>${etCard()}</aside></div>`;
+  // the chips head the list's column: when they wrap, the Selected card beside them stays where it is (as in Collections)
+  return `<div class=srcart><div class=srcmain>${chips}${etList('src', shown, draftPath(), null)}</div><aside class="side portrait" id=portrait aria-label=Selected>${etCard()}</aside></div>`;
 }
 function sourceRuns(runs) {
   return runs.map(x => `<div class=fr data-run="${esc(x.id)}" role=button tabindex=0><span class=ic>${ic(flowKey(x))}</span><b>${esc(runName(x))}</b>` +
@@ -171,13 +172,11 @@ function filterRow(rows) {
 // a rail entry: the source as a Runs entry (its runs are the runs grouped under it in the Runs rail)
 function sourceItem(r) {
   const g = (state.groups || []).find(x => x.key === 'src:' + r.slug) || {runs: []};
-  const read = g.runs.find(x => flowKey(x) === 'read' && (x.cells || []).length);
-  const cells = read ? read.cells : [];
   const sel = state.src.sel === r.slug;
   const meta = [String(r.format || '').toUpperCase(), r.page_count ? `${r.page_count} ${plural(r.page_count, 'page')}` : '', r.builtin ? 'Built in' : ''].filter(Boolean).join(' · ');
   return `<li data-src-pick="${esc(r.slug)}"${sel ? ' class=sel' : ''}><span class=sic aria-hidden=true>${ic(typeIcon(r))}</span><b title="${esc(r.title)}">${esc(r.title)}</b>` +
     `<span class=cm>${catMark(r)}</span><small>${esc(meta)}</small>${lightsHTML(g)}` +
-    (cells.length ? `<div class=mini>${cells.map(c => `<i class="${cellRec(c.status, c.records)}"></i>`).join('')}</div>` : '') + '</li>';
+    miniRows(g) + '</li>';
 }
 // the source's whole page range, one Records row: the pages runs have read shaded by what they found, the rest to do
 function sourcePages(r) {
@@ -186,21 +185,42 @@ function sourcePages(r) {
   const g = (state.groups || []).find(x => x.key === 'src:' + r.slug) || {runs: []};
   const read = new Map();
   for (const run of g.runs.filter(x => flowKey(x) === 'read').reverse()) for (const c of run.cells || []) read.set(c.page, c);   // newest wins
-  const rows = Array.from({length: n}, (_, i) => read.get(i + 1) || {page: i + 1, status: 'todo', records: 0});
-  return `<div class="hm srcheat">${heatGrid(rows, ['records'])}</div>${read.size ? legend(heatKeys(rows)) : ''}`;
+  const rows = Array.from({length: n}, (_, i) => ({...(read.get(i + 1) || {page: i + 1, status: 'todo', records: 0})}));
+  return `<div class="hm srcheat">${heatGrid(rows, ['records', ...srcLanes(r, g, rows)])}</div>${read.size ? legend(heatKeys(rows)) : ''}`;
+}
+// a lane per flow after Read that has a finished run on this source (its newest), in Apollo's flow order: each page shaded by
+// what that run touched there (the records it wrote, the questions it put), as the manager counts them (entitytrace.py lanes).
+// A run on the Draft that names no source counts when it touched this source's pages.
+// the flows in Apollo's order (runview.FLOWS); an old Links run reads as Wikidata through flowKey (CZ318)
+const SRC_LANES = [['assemble', 'Assemble'], ['refine', 'Refine'], ['timeline', 'Timeline'], ['places', 'Places'], ['stubs', 'Stubs'], ['enrich', 'Enrich'],
+                   ['wikidata', 'Wikidata'], ['finance', 'Finance'], ['wiki', 'Curate']];
+function srcLanes(r, g, rows) {
+  const lanes = (state.et.src[r.slug] || {}).lanes || {}, out = [];
+  const ours = x => lanes[x.id] && (g.runs.includes(x) || Object.keys(lanes[x.id]).length);
+  for (const [k, w] of SRC_LANES) {
+    const run = (state.runs || []).find(x => flowKey(x) === k && x.status === 'done' && ours(x));
+    if (!run) continue;
+    const m = 'lane-' + k, per = lanes[run.id];
+    for (const h of rows) h[m] = per[h.page] || 0;
+    HEAT_LABEL[m] = w;
+    HEAT_N[m] = h => h[m] || 0;
+    HEAT[m] = h => { const c = cellRec(h.status, h[m]); return c === 'z' ? 'zg' : c; };
+    out.push(m);
+  }
+  return out;
 }
 function sourceHead(r) {
   const pg = r.pages && typeof r.pages === 'object' ? `${r.pages.from}-${r.pages.to}` : '';
   const open = !!state.src.open[r.slug];
-  const ctl = r.builtin ? '' : r.kind === 'media' ? `<button type=button class="btn danger" data-act=remove>Remove</button>` :
-    `<label class=f><span>Pages</span><input class=spages value="${esc(pg)}" inputmode=numeric data-f=pages aria-label=Pages></label>` +
-    `<button type=button class=btn data-act=brief aria-expanded=${open}>Brief</button><button type=button class="btn danger" data-act=remove>Remove</button>`;
+  // one row beside the title (owner): the page range, Brief, the model and Catalogue, Remove last
+  const pages = r.builtin || r.kind === 'media' ? '' : `<input class=spages value="${esc(pg)}" inputmode=numeric data-f=pages aria-label=Pages title=Pages placeholder=Pages>` +
+    `<button type=button class=btn data-act=brief aria-expanded=${open}>Brief</button>`;
+  const ctl = pages + modelPill() + catAction() + (r.builtin ? '' : `<button type=button class="btn danger" data-act=remove>Remove</button>`);
   const brief = open && !r.builtin && r.kind !== 'media' ? `<div class=sbrief><textarea data-f=brief aria-label=Brief rows=7>${esc((r.slug in state.src.draft ? state.src.draft[r.slug] : (r.brief || '')).trim())}</textarea><div class=sbtn>` +
     `<button type=button class=ib data-act=generate title="Generate brief" aria-label="Generate brief"${state.src.gen[r.slug] ? ' disabled aria-busy=true' : ''}>${state.src.gen[r.slug] ? '<span class=spin aria-hidden=true></span>' : ic('sparkle')}</button>` +
     `<button type=button class=ib data-act=default title="Default brief" aria-label="Default brief">${ic('reset')}</button></div></div>` : '';
   const ttl = r.builtin || r.kind === 'media' ? '' : ` class=inl data-edit=src data-f=title data-ek="${esc(r.slug)}:title" data-v="${esc(r.title)}" tabindex=0`;
-  return `<div class="srow srhead" data-slug="${esc(r.slug)}"><div class=dhead><h2 title="${esc(r.title)}"${ttl}>${esc(r.title)}</h2><div class=actions>${ctl}</div></div>` +
-    `<div class=srtools>${modelPill()}<span class=grow></span>${catAction()}</div>${brief}</div>`;
+  return `<div class="srow srhead" data-slug="${esc(r.slug)}"><div class=dhead><h2 title="${esc(r.title)}"${ttl}>${esc(r.title)}</h2><div class=actions>${ctl}</div></div>${brief}</div>`;
 }
 function drawSources() {
   const box = $('#srcpanel');
@@ -428,6 +448,7 @@ function startEdit(td) {
   ta.setAttribute('aria-label', td.closest('tr') ? (td.closest('tr').querySelector('th') || td).textContent.trim() : 'Value');
   ta.dataset.dirty = '1';
   let done = false;
+  const rj = td.querySelector(':scope > .rjm');               // a waiting value's own minus (several values under one label): kept through the edit
   const fit = () => { if (long) { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight}px`; } };
   const leave = save => {
     if (done) return;
@@ -436,6 +457,7 @@ function startEdit(td) {
     td.classList.remove('editing');
     const val = save && v !== was ? v : was;
     td.textContent = td.dataset.edit === 'cat' ? catDisp(td.dataset.key, td.dataset.kind, val) : val;
+    if (rj) td.prepend(rj);
     if (save && v !== was) commitEdit(td, v);
   };
   ta.addEventListener('keydown', e => {
@@ -445,7 +467,7 @@ function startEdit(td) {
   ta.addEventListener('blur', () => leave(true));
   ta.addEventListener('input', fit);
   td.classList.add('editing');
-  td.replaceChildren(ta);
+  td.replaceChildren(...(rj ? [rj, ta] : [ta]));
   fit();
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -480,7 +502,51 @@ async function rejectField(slug, i, btn) {
   }
   await catLoad(slug, true);
 }
+// an accepted value's minus removes it at once (an empty value removes a field)
+async function removeField(slug, i) {
+  try {
+    await api('/api/catalogue/edit', {source: slug, index: i, value: '', pending: false});
+  } catch (e) {
+    notify('error', `Sources: ${e.message}`);
+  }
+  await catLoad(slug, true);
+}
+// "+ Field": the button turns into a field picker and a value box; Enter adds, Esc cancels
+function openAdd(btn) {
+  const slug = state.src.sel;
+  if (!slug) return;
+  const opts = JSON.parse(btn.dataset.opts), pend = btn.dataset.add === 'pend';
+  const form = document.createElement('form');
+  form.className = 'catform';
+  form.innerHTML = `<select class=ined aria-label=Field>${opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select><input class=ined aria-label=Value autocomplete=off>`;
+  const [sel, inp] = form.children;
+  let done = false;
+  const close = () => { if (!done) { done = true; form.replaceWith(btn); } };
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const v = inp.value.replace(/\s+/g, ' ').trim();
+    if (!v) { inp.focus(); return; }
+    const [key, kind] = sel.value.split('|');
+    try {
+      await api('/api/catalogue/add', {source: slug, key, kind, value: v, pending: pend});
+    } catch (err) {
+      notify('error', `Sources: ${err.message}`);      // the form stays, to correct the text
+      inp.focus();
+      return;
+    }
+    done = true;
+    await catLoad(slug, true);
+  });
+  form.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } });
+  form.addEventListener('focusout', () => setTimeout(() => { if (!form.contains(document.activeElement)) close(); }, 0));
+  btn.replaceWith(form);
+  inp.focus();
+}
 $('#srcpanel').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if (del && state.src.sel) { removeField(state.src.sel, Number(del.dataset.del)); return; }
+  const ad = e.target.closest('[data-add]');
+  if (ad) { openAdd(ad); return; }
   const rj = e.target.closest('[data-rej]');
   if (rj && state.src.sel) { rejectField(state.src.sel, Number(rj.dataset.rej), rj); return; }
   const td = e.target.closest('[data-edit]');

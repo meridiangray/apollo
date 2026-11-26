@@ -3,7 +3,7 @@
 // still scroll. The line shows only while a panel overflows.
 'use strict';
 (() => {
-  const SCROLLERS = ['#runs-scroll', '#tabbody', '#cfgpanel', '#srcpanel', '#colpanel', '#hispanel', '#portrait', '.rbody', '.tres'];
+  const SCROLLERS = ['#runs-scroll', '#tabbody', '#cfgpanel', '#srcpanel', '#colpanel', '#hispanel', '#setpanel .xmain', '#portrait', '.rbody', '.tres'];
   const bar = document.querySelector('header.bar');
   if (!bar) return;
   const line = document.createElement('div'), fill = document.createElement('i');

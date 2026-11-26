@@ -52,8 +52,8 @@ def test_pollard_pp_1_to_11_one_dollar_lag_off_is_the_smoke_composition_except_f
     flow = cfg_of(apollo.plan(flow="read", source="pollard", pages="1-11", budget="1", name="same"))
     assert flow["budget_usd"] == smoke["budget_usd"] == 1 and flow["pages"] == smoke["pages"] == {"from": 1, "to": 11}
     # the differences, all intended: the label the archive's name carries, the recipe's name, the `full` recipe's own
-    # per-page rates (so its call totals), and the one tool (ask_person) that `full` authorizes and `smoke` does not
-    assert changed(smoke, flow) == {"archive.name", "authorized", "budgets.escalations", "budgets.haiku", "budgets.sonnet", "recipe", "sonnet_parallel"}
+    # per-page rates (no call or token caps: every budget is null, in both), and the one tool (ask_person) that `full` authorizes and `smoke` does not
+    assert changed(smoke, flow) == {"archive.name", "authorized", "recipe", "sonnet_parallel"}
     assert flow["recipe"] == "full" and flow["authorized"] == smoke["authorized"] + ["ask_person"]
     assert "lag" not in flow and flow["archive"]["name"].endswith("(page flow, full, pp. 1-11)")
 
@@ -63,14 +63,17 @@ def test_lag_on_takes_the_lag_recipes_settings_and_tools():
     flow = cfg_of(apollo.plan(flow="read", source="pollard", pages="1-11", budget="1", lag=True, name="same"))
     assert flow["lag"] == lag["lag"] and flow["lag"]["enabled"] is True and flow["authorized"] == lag["authorized"]
     off = cfg_of(apollo.plan(flow="read", source="pollard", pages="1-11", budget="1", name="same"))
-    assert flow["budgets"]["haiku"] == off["budgets"]["haiku"] + lag["lag"]["haiku"]       # the lag's own caps are added
+    assert flow["budgets"] == off["budgets"] and all(v is None for v in flow["budgets"].values())      # no call caps, so the lag adds none
 
 
-def test_the_cost_cap_default_follows_the_pages():
-    assert [apollo.default_budget(n) for n in (1, 11, 12, 30, 50, 107, 500)] == [1, 1, 1, 1.5, 2.5, 5, 5]
-    assert apollo.plan(flow="read", source="pollard", pages="1-11", name="a")["budget_usd"] == 1
-    assert apollo.plan(flow="read", source="pollard", pages="1-50", name="b")["budget_usd"] == 2.5
+def test_a_run_has_no_cost_cap_unless_the_person_sets_one(monkeypatch):
+    assert [apollo.default_budget(n) for n in (1, 11, 107, 500)] == [None] * 4
+    assert apollo.plan(flow="read", source="pollard", pages="1-11", name="a")["budget_usd"] is None
+    assert apollo.plan(flow="read", source="pollard", pages="1-50", name="b")["budget_usd"] is None
     assert apollo.plan(flow="read", source="pollard", pages="1-50", budget="3", name="c")["budget_usd"] == 3
+    wf = apollo.plan(flow="stubs", archive="/a/arch", dry=True)
+    assert wf["budget_usd"] is None and "--max-budget-usd" not in wf["command"]
+    assert "--max-budget-usd" in apollo.plan(flow="stubs", archive="/a/arch", dry=True, budget="2")["command"]
 
 
 def test_hard_pages_off_stops_the_escalations_and_rate_off_drops_the_rubric():
@@ -153,8 +156,8 @@ def test_the_collections_command_names_the_run_and_refuses_an_archive_outside_ap
     collections_io.write(collections_io.path(draft, "pollard-da-actors"), [{"id": "a", "schema": "Person", "properties": {"name": ["A"]}}], False)
     archives.track(rec["id"], str(draft), ["pollard-da-actors"])
     out = apollo.other_command(type("A", (), {"cmd": "collections", "archive": str(draft), "collection": None, "offset": 0, "limit": 200})())
-    assert out["collections"][0]["run"] == {"id": rec["id"], "flow": "Read", "source": "Pollard damage assessment"} or \
-        out["collections"][0]["run"]["flow"] == "Read"
+    assert out["collections"][0]["run"] == {"id": rec["id"], "flow": "Basic", "source": "Pollard damage assessment"} or \
+        out["collections"][0]["run"]["flow"] == "Basic"
     bad = apollo.other_command(type("A", (), {"cmd": "collections", "archive": str(tmp_path), "collection": None, "offset": 0, "limit": 1})())
     assert bad["ok"] is False
 
@@ -325,25 +328,42 @@ def test_a_page_without_text_shows_the_ocr_text_when_there_is_some(tmp_path, mon
 def test_a_run_is_named_by_its_flow_and_its_source_and_an_old_recipe_run_still_shows():
     rec = apollo.plan(flow="read", source="pollard", pages="1-3", dry=True)
     s = apollo.summary({**rec, "started": "2026-11-25T10:00:00"})
-    assert s["flow"] == "Read" and s["source_title"] == "The Jonathan Jay Pollard Espionage Case: A Damage Assessment"
+    assert s["flow"] == "Basic" and s["source_title"] == "The Jonathan Jay Pollard Espionage Case: A Damage Assessment"
     old = apollo.plan(recipe="smoke", source="pollard", dry=True)
-    assert apollo.summary({**old, "started": "2026-11-25T10:00:00"})["flow"] == "Read"
+    assert apollo.summary({**old, "started": "2026-11-25T10:00:00"})["flow"] == "Basic"
     wf = apollo.plan(flow="enrich", archive="/a/arch", dry=True)
     assert apollo.summary({**wf, "started": "2026-11-25T10:00:00"})["flow"] == "Enrich"
 
 
 def test_flow_names_domains_and_agents():
     import apollo, runview
-    assert [f["name"] for f in runview.flow_catalogue()] == ["Read", "Links", "Places", "Stubs", "Enrich", "Wiki"]
-    assert [f["domain"] for f in runview.flow_catalogue()] == ["Records", "Graph", "Geo", "Profiles", "Profiles", "Wiki"]
-    assert runview.flow_key({"flow": "Fill stubs"}) == "stubs" and runview.flow_label({"kind": "pageflow"}) == "Read"
-    assert runview.flow_key({"name": "workflow-links", "kind": "mcp-session"}) == "links"
+    assert [f["name"] for f in runview.flow_catalogue()] == ["Basic", "Assemble", "Refine", "Timeline", "Places", "Stubs", "Enrich", "Wikidata",
+                                                            "Finance", "Curate"]
+    assert [f["domain"] for f in runview.flow_catalogue()] == ["Records", "Graph", "Graph", "Time", "Geo", "Profiles", "Profiles", "Profiles",
+                                                              "Finance", "Curate"]
+    assert runview.flow_key({"flow": "Fill stubs"}) == "stubs" and runview.flow_label({"kind": "pageflow"}) == "Basic"
+    assert runview.flow_key({"name": "workflow-links", "kind": "mcp-session"}) == "wikidata"         # Links became Wikidata
+    assert runview.flow_key({"flow": "links"}) == runview.flow_key({"flow": "Suggest links"}) == "wikidata"
     assert apollo.agents_for("read", None) == {"haiku": 4, "sonnet": 2}
-    assert apollo.agents_for("places", {"haiku": 3}) == {"haiku": 3, "sonnet": 1, "opus": 0}
-    for flow, bad in (("read", {"opus": 1}), ("read", {"haiku": 0}), ("links", {"haiku": 1}), ("stubs", {"sonnet": 9})):
+    assert apollo.agents_for("stubs", {"haiku": 3}) == {"haiku": 3, "sonnet": 1, "opus": 0}
+    for flow, bad in (("read", {"opus": 1}), ("read", {"haiku": 0}), ("assemble", {"sonnet": 2}), ("stubs", {"sonnet": 9})):
         with pytest.raises(ValueError):
             apollo.agents_for(flow, bad)
     assert apollo.sub_agents({"haiku": 3, "sonnet": 1, "opus": 0}, "claude-sonnet-5-5") == {"haiku": 3}
+
+
+def test_scoped_flows_brief_their_tools_and_wikidata_answers_only_when_switched_on():
+    import apollo
+    assert apollo.AFTER == ("assemble",) and "links" not in {w[0] for w in apollo.WORKFLOWS}
+    assert "wikidata_decide" in apollo.flow_brief("wikidata", True) and "wikidata_decide" not in apollo.flow_brief("wikidata", False)
+    assert "views=[]" in apollo.flow_brief("timeline") and "authorized=[\"assemble\", \"save_source_note\"]" in apollo.flow_brief("assemble")
+    assert apollo.workflow_steps("links") == apollo.workflow_steps("wikidata") != []
+    rec = apollo.plan(flow="wikidata", archive="/a/arch", source="tarbell", dry=True, answer=True)    # the engine now
+    assert rec["kind"] == "engine" and rec["command"][2:5] == ["run", "--flow", "wikidata"]
+    with pytest.raises(ValueError):
+        apollo.plan(flow="timeline", archive="/a/arch", dry=True, answer=True)
+    with pytest.raises(ValueError):
+        apollo.plan(flow="read", source="pollard", dry=True, after="links")
 
 
 def test_prepare_source_runs_the_steps_and_skips_what_is_cached(monkeypatch, tmp_path):
@@ -359,15 +379,106 @@ def test_prepare_source_runs_the_steps_and_skips_what_is_cached(monkeypatch, tmp
     assert got == {"analyse": "done", "ocr": "skipped", "text": "cached", "catalogue": "done"} and calls == [("basic", "x")]
 
 
-def test_wiki_flow_shapes_then_prepares_in_one_session():
+def test_curate_and_finance_start_the_engine():
     import apollo, runview
     spec = next(f for f in runview.flow_catalogue() if f["key"] == "wiki")
-    assert spec["name"] == "Wiki" and spec["domain"] == "Wiki" and spec["needs"] == "archive"
-    assert spec["grades"]["sonnet"] == {"default": 1, "max": 4}
+    assert spec["name"] == "Curate" and spec["needs"] == "archive" and spec["grades"]["sonnet"] == {"default": 1, "max": 1}
+    for flow in ("wiki", "finance"):
+        rec = apollo.plan(flow=flow, archive="/a/arch", dry=True, for_source="pollard")
+        cmd = rec["command"]
+        assert rec["kind"] == "engine" and cmd[cmd.index("--flow") + 1] == flow and cmd[cmd.index("--grade") + 1] == "sonnet"
     rec = apollo.plan(flow="wiki", archive="/a/arch", dry=True, for_source="pollard")
-    assert runview.flow_key({**rec, "flow": None}) == "wiki" and apollo.summary({**rec, "started": "2026-11-25T10:00:00"})["flow"] == "Wiki"
-    prompt = next(v for k, v in rec["files"].items() if k.endswith(".md") or "prompt" in k.lower() and not k.endswith(".json"))
-    assert prompt.index("collection-shape") < prompt.index("view-prep") and "/a/arch" in prompt and "Must not" in prompt
-    steps = apollo.workflow_steps("wiki")
-    assert steps == apollo.workflow_steps("collection-shape") + apollo.workflow_steps("view-prep")[:12 - len(apollo.workflow_steps("collection-shape"))]
+    assert apollo.summary({**rec, "started": "2026-11-25T10:00:00"})["flow"] == "Curate"
     assert apollo.agents_for("wiki", None) == {"haiku": 0, "sonnet": 1, "opus": 0}
+
+
+def test_assemble_covers_the_pages_read_so_far_or_the_range_set(monkeypatch, tmp_path):
+    import apollo
+    arch = tmp_path / "arch"
+    arch.mkdir()
+    for rid, pages in (("r1", {"1": "done", "2": "done", "3": "out-of-scope"}), ("r2", {"2": "done", "5": "done", "6": "empty"})):
+        pf = tmp_path / rid / "pageflow"
+        pf.mkdir(parents=True)
+        (pf / "progress.json").write_text(json.dumps({"pages": pages}), encoding="utf-8")
+        apollo.save({"id": rid, "kind": "pageflow", "source": "tarbell", "archive": str(arch), "run_folder": str(tmp_path / rid),
+                     "started": "2026-11-26T10:00:00"})
+    apollo.save({"id": "r3", "kind": "pageflow", "source": "tarbell", "archive": "/elsewhere", "run_folder": str(tmp_path / "r1"),
+                 "started": "2026-11-26T11:00:00"})
+    assert apollo.source_pages("tarbell", arch) == [1, 2, 5]                 # the union; skipped and out-of-scope are not read
+    assert apollo.source_pages("other", arch) == []
+    monkeypatch.setattr(apollo, "known_sources", lambda: {"tarbell": "Tarbell, Standard Oil"})
+    text = apollo.assemble_range(str(arch), "tarbell")
+    assert "Source: tarbell (Tarbell, Standard Oil)" in text and "Pages to cover: 1-2,5" in text and "archive so far" in text
+    assert "Pages to cover: 5-40 (the range the person set)" in apollo.assemble_range(str(arch), "tarbell", "5-40")
+    assert "No page of it was read" in apollo.assemble_range(str(arch), "other")
+    with pytest.raises(ValueError):
+        apollo.assemble_range(str(arch), "tarbell", "9-x")
+
+
+def test_a_run_lifts_the_mcp_reply_cap_and_sets_one_read_size(monkeypatch):
+    import apollo
+    monkeypatch.delenv("MAX_MCP_OUTPUT_TOKENS", raising=False)
+    monkeypatch.delenv("HYDRA_MCP_READ_CHARS", raising=False)
+    env = apollo.run_env()
+    assert env["MAX_MCP_OUTPUT_TOKENS"] == "100000" and env["HYDRA_MCP_READ_CHARS"] == "40000"
+    monkeypatch.setenv("MAX_MCP_OUTPUT_TOKENS", "150000")                     # the person's own setting stands
+    assert apollo.run_env()["MAX_MCP_OUTPUT_TOKENS"] == "150000"
+    rec = apollo.plan(flow="stubs", archive="/a/arch", dry=True, pages="5-9")
+    client = json.loads(next(t for f, t in rec["files"].items() if f.endswith("mcp.json")))
+    assert client["mcpServers"]["hydra"]["env"]["HYDRA_MCP_READ_CHARS"] == "40000"
+    prompt = next(t for f, t in rec["files"].items() if f.endswith("prompt.md"))
+    assert "workflow stubs" in prompt
+
+
+# ---- the engine flows (pageflow/engine.py): Assemble and Timeline start the driver, not a session ----------------------
+
+def test_assemble_and_timeline_start_the_engine_with_the_grade_the_person_picks():
+    import apollo
+    on = apollo.plan(flow="assemble", archive="/a/arch", source="tarbell", dry=True, pages="36-50")
+    cmd = on["command"]
+    assert on["kind"] == "engine" and cmd[1].endswith("pageflow/engine.py") and cmd[2:5] == ["run", "--flow", "assemble"]
+    assert cmd[cmd.index("--archive") + 1] == "/a/arch" and cmd[cmd.index("--source") + 1] == "tarbell"
+    assert cmd[cmd.index("--name") + 1] == on["id"] and on["run_folder"].endswith("/runs/" + on["id"])
+    assert cmd[cmd.index("--root") + 1] == str(apollo.root_for(True)) and "--dry" in cmd and "--pages" in cmd
+    assert cmd[cmd.index("--grade") + 1] == "sonnet" and "--no-answers" not in cmd and on["opts"]["answer"] is True
+    assert on["files"] == {} and "--max-budget-usd" not in cmd and on["io"]["stdout"].endswith("driver.log")
+    off = apollo.plan(flow="assemble", archive="/a/arch", source="tarbell", dry=True, answer=False,
+                      agents={"haiku": 0, "sonnet": 0, "opus": 1})
+    assert "--no-answers" in off["command"] and off["command"][off["command"].index("--grade") + 1] == "opus"
+    tl = apollo.plan(flow="timeline", archive="/a/arch", for_source="tarbell", agents={"haiku": 1, "sonnet": 0})
+    assert tl["kind"] == "engine" and tl["command"][tl["command"].index("--grade") + 1] == "haiku" and "--dry" not in tl["command"]
+    for kw in ({"flow": "assemble", "archive": "/a/arch"}, {"flow": "timeline", "source": "tarbell"}):
+        with pytest.raises(ValueError):
+            apollo.plan(dry=True, **kw)
+
+
+def test_an_engine_run_shows_its_page_heat_cost_and_ending(tmp_path):
+    import apollo
+    rec = {**apollo.plan(flow="assemble", archive="/a/arch", source="tarbell", dry=True), "run_folder": str(tmp_path),
+           "started": "2026-11-26T10:00:00"}
+    (tmp_path / "pageflow").mkdir()
+    (tmp_path / "pageflow" / "progress.json").write_text(json.dumps({"fraction": 0.5, "stage": "judge", "pages": {"36": "done", "37": "escalated"}}), encoding="utf-8")
+    (tmp_path / "pageflow" / "found.jsonl").write_text(json.dumps({"page": 36, "schema": "merge", "thing": "A into B", "quote": "q"}) + "\n", encoding="utf-8")
+    (tmp_path / "assemble").mkdir()
+    (tmp_path / "assemble" / "state.json").write_text(json.dumps({"status": "done", "models": {"used": {"sonnet": 2}, "tokens": {}}}), encoding="utf-8")
+    s = apollo.summary(rec)
+    assert s["flow"] == "Assemble" and s["kind"] == "engine" and [c[:2] for c in s["cells"]] == [[36, "done"], [37, "escalated"]]
+    assert s["progress"]["pages_read"] == 2
+    assert apollo.final_status(rec, 0, False) == ("done", "done")
+    (tmp_path / "assemble" / "state.json").write_text(json.dumps({"status": "stopped-error: boom"}), encoding="utf-8")
+    assert apollo.final_status(rec, 2, False)[0] == "stopped"
+
+
+def test_refine_starts_the_engine_with_opus_and_finds_its_source_from_the_basic_run(tmp_path):
+    import apollo, runview
+    spec = next(f for f in runview.flow_catalogue() if f["key"] == "refine")
+    assert spec["name"] == "Refine" and spec["after"] == "assemble" and spec["grades"]["opus"]["default"] == 1
+    rec = apollo.plan(flow="refine", archive="/a/arch", source="tarbell", dry=True)
+    cmd = rec["command"]
+    assert rec["kind"] == "engine" and cmd[2:5] == ["run", "--flow", "refine"] and cmd[cmd.index("--grade") + 1] == "opus"
+    son = apollo.plan(flow="refine", archive="/a/arch", source="tarbell", agents={"haiku": 0, "sonnet": 1, "opus": 0})["command"]
+    assert son[son.index("--grade") + 1] == "sonnet"                              # the person picks another grade
+    apollo.save({"id": "basic-1", "kind": "pageflow", "source": "tarbell", "archive": "/a/arch", "run_folder": str(tmp_path),
+                 "started": "2026-11-26T10:00:00"})
+    got = apollo.plan(flow="refine", archive="/a/arch", dry=True)                   # no source given: the Basic run's
+    assert got["command"][got["command"].index("--source") + 1] == "tarbell"

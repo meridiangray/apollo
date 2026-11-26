@@ -71,7 +71,9 @@ def test_a_session_runs_claude_by_path_with_the_linux_mcp_config(scratch, brief)
     assert cmd[0] == "/bin/false"                                              # APOLLO_CLAUDE; else ~/.local/bin/claude
     assert cmd[cmd.index("--model") + 1] == apollo.SESSION_MODEL
     mcp = cmd[cmd.index("--mcp-config") + 1]
-    assert json.loads(rec["files"][mcp]) == json.loads(apollo.MCP_CLIENT.read_text())
+    client = json.loads(apollo.MCP_CLIENT.read_text())
+    client["mcpServers"]["hydra"]["env"].update(apollo.mcp_env())                    # every run tells its hydra-mcp one read size
+    assert json.loads(rec["files"][mcp]) == client
     assert "--strict-mcp-config" in cmd and cmd[cmd.index("--max-budget-usd") + 1] == "5"
     assert cmd[cmd.index("--allowedTools") + 1] == "mcp__hydra" and "--verbose" in cmd
     assert cmd[cmd.index("--output-format") + 1] == "stream-json"
@@ -176,7 +178,7 @@ def test_a_recipe_on_a_source_is_composed_into_the_run_config(scratch):
     assert rec["id"].endswith("-dry-smoke-pollard") and rec["recipe"] == "smoke" and rec["source"] == "pollard"
     assert cfg["run"] == rec["id"] and cfg["run_folder"] == str(root / "runs" / rec["id"])
     assert cfg["archive"]["path"] == str(root / "archives" / rec["id"] / "pollard-da")
-    assert cfg["pages"] == {"from": 20, "to": 22} and cfg["budgets"]["haiku"] == round(7.27 * 3 * 3)   # scaled to 3 pages
+    assert cfg["pages"] == {"from": 20, "to": 22} and cfg["budgets"]["haiku"] is None   # no call or token caps
     assert cfg["stub_models"] is True and cfg["window"] is False and cfg["lag"]["enabled"] is False
     assert rec["budget_usd"] == cfg["budget_usd"] == 1 and apollo.plan(recipe="smoke", source="pollard", dry=True, budget="2.5")["budget_usd"] == 2.5
     assert cfg["source"]["file"].endswith("sources/pollard-damage-assessment.pdf") and cfg["hydra_context"] == "general"
@@ -251,7 +253,8 @@ def test_models_and_without_shape_the_composed_config(scratch):
 def test_recipe_detail_has_a_button_per_stage_with_its_prompts():
     d = apollo.recipe_detail("full", "pollard")
     keys = [s["key"] for s in d["stages"]]
-    assert keys == ["analyse", "read", "escalate", "rate", "stubs", "places", "enrich", "wiki", "links"]
+    assert keys == ["analyse", "read", "escalate", "rate", "stubs", "places", "enrich", "wiki", "assemble", "timeline", "wikidata",
+                    "finance"]
     st = {s["key"]: s for s in d["stages"]}
     assert st["analyse"]["model"] is None and st["read"]["role"] == "haiku" and st["read"]["prompts"] == ["A", "C", "T", "I"]
     assert st["stubs"]["prompts"] == ["workflow"] and all(s.get("about") for s in d["stages"]) and apollo.prompt_text("workflow")["text"].startswith("# ")

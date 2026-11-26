@@ -15,7 +15,7 @@ import runlog
 
 KINDS = ("run", "tool", "source", "toast")
 TOOLS = {"analyse": "Analyse", "ocr": "OCR", "text": "Text", "ready": "Ready", "check": "Check", "build": "Build",
-         "proofread": "Proofread", "catalogue": "Catalogue", "wikipedia": "Wikipedia add"}
+         "proofread": "Proofread", "catalogue": "Catalogue", "wikipedia": "Wikipedia add", "complex": "Complex Collection"}
 SOURCE_WORD = {"add": "Source added", "remove": "Source removed", "hide": "Source hidden", "unhide": "Source shown"}
 
 

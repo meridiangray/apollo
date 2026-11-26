@@ -67,6 +67,7 @@ func TestCatalogueAndHistoryRoutesGuardTheirInput(t *testing.T) {
 		{"GET", "/api/history?kind=everything", ""},
 		{"POST", "/api/catalogue", `{"source":"pollard","model":"gpt"}`},
 		{"POST", "/api/catalogue/act", `{"source":"pollard","action":"delete"}`},
+		{"POST", "/api/catalogue/add", `{"source":"../x","key":"title","value":"x"}`},
 		{"POST", "/api/proofread", `{"source":"pollard","pages":"1","model":"gpt"}`},
 	} {
 		if w := do(h, c.method, c.path, host, tok, c.body); w.Code != 400 {

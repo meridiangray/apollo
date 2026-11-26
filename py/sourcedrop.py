@@ -23,6 +23,8 @@ from pathlib import Path
 
 import yaml
 
+import settings
+
 HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 PAGEFLOW = Path(os.environ.get("PAGEFLOW_DIR") or HERE.parent / "hydra-mcp-testing" / "pageflow")
 HYDRA_SRC = HERE.parent / "hydra-git" / "src"
@@ -42,7 +44,7 @@ MEANINGLESS_TITLE = re.compile(r"^(untitled|document\d*|microsoft word.*|.*\.(do
 
 def folder() -> Path:
     """Where dropped sources live (APOLLO_SOURCES overrides, for tests): the profiles, and files/ beside them."""
-    return Path(os.environ.get("APOLLO_SOURCES") or HERE / "sources")
+    return settings.folder("folders.sources", HERE / "sources")            # APOLLO_SOURCES, then Settings
 
 
 def files_dir() -> Path:

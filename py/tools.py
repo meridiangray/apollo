@@ -27,6 +27,7 @@ import time
 from pathlib import Path
 
 import runfiles
+import settings
 import toolargs
 
 HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
@@ -97,7 +98,7 @@ def archive_roots() -> list[Path]:
     env = os.environ.get("APOLLO_ROOT")
     live = Path(env) if env else runfiles.TESTING
     dry = (Path(env) / "dry") if env else HERE / "dry"
-    own = Path(os.environ.get("APOLLO_ARCHIVES") or HERE / "archives")
+    own = settings.folder("folders.archives", HERE / "archives")
     return [(live / "archives").resolve(), (dry / "archives").resolve(), own.resolve()]
 
 

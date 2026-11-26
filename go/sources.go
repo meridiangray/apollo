@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -30,6 +31,7 @@ var (
 	reSourceSlug = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,59}$`)
 	reUnsafeName = regexp.MustCompile(`[^A-Za-z0-9 ._()\-]`)
 	rePageNo     = regexp.MustCompile(`^\d{1,6}$`)
+	reCollName   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$`) // a hydra collection name
 )
 
 // incomingDir is apollo/sources/incoming beside the manager, as this OS shows it.
@@ -237,7 +239,8 @@ func (s *Server) pagetext(w http.ResponseWriter, r *http.Request) {
 	passJSON(w, raw, err, http.StatusNotFound)
 }
 
-// collections are an archive's collections, or (?collection=NAME) one collection's records from ?offset=.
+// collections are an archive's collections and groups, or (?collection=NAME, ?group=KEY) one collection's or one group's
+// records from ?offset=.
 func (s *Server) collections(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	a := strings.TrimSpace(q.Get("archive"))
@@ -246,12 +249,16 @@ func (s *Server) collections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	args := []string{"collections", managerPath(s.GOOS, a)}
-	if c := q.Get("collection"); c != "" {
+	c, flag := q.Get("collection"), "--collection"
+	if g := q.Get("group"); g != "" {
+		c, flag = g, "--group"
+	}
+	if c != "" {
 		if strings.HasPrefix(c, "-") || strings.ContainsAny(c, "\x00\r\n/\\") {
 			fail(w, http.StatusBadRequest, "a collection name")
 			return
 		}
-		args = append(args, "--collection", c)
+		args = append(args, flag, c)
 		if o := q.Get("offset"); o != "" {
 			if !rePageNo.MatchString(o) {
 				fail(w, http.StatusBadRequest, "offset: a whole number")
@@ -261,6 +268,36 @@ func (s *Server) collections(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	raw, err := s.call(r, 700*time.Millisecond, args...)
+	passJSON(w, raw, err, http.StatusConflict)
+}
+
+// collectionGroup makes a Complex Collection ({archive, title, collections}): a hydra collection group of collections from
+// several sources. hydra checks it, rebuilds the archive and takes one history step, so it may take a while.
+func (s *Server) collectionGroup(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Archive     string   `json:"archive"`
+		Title       string   `json:"title"`
+		Collections []string `json:"collections"`
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+	if err == nil {
+		err = json.Unmarshal(body, &req)
+	}
+	a, t := strings.TrimSpace(req.Archive), strings.TrimSpace(req.Title)
+	ok := err == nil && a != "" && !strings.HasPrefix(a, "-") && !strings.ContainsAny(a, "\x00\r\n") &&
+		t != "" && !strings.ContainsAny(t, "\x00\r\n") && len(req.Collections) >= 2
+	for _, c := range req.Collections {
+		ok = ok && reCollName.MatchString(c)
+	}
+	if !ok {
+		fail(w, http.StatusBadRequest, "a JSON body: archive, title, collections (two or more)")
+		return
+	}
+	s.groupMu.Lock()
+	defer s.groupMu.Unlock()
+	raw, err := s.Backend.Call(context.WithoutCancel(r.Context()), 5*time.Minute, "collectiongroup", managerPath(s.GOOS, a),
+		"--title="+t, "--collections="+strings.Join(req.Collections, ","))
+	s.cache.clear()
 	passJSON(w, raw, err, http.StatusConflict)
 }
 
@@ -334,4 +371,44 @@ func (s *Server) notice(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, err := s.Backend.Call(r.Context(), 20*time.Second, "notice", "--level", req.Level, "--text", t)
 	s.outcome(w, raw, err)
+}
+
+// collectionGroupEdit renames a Complex Collection ({archive, key, title}) or, with no title, ungroups it ({archive, key}). Only
+// the grouping changes, never a collection or a record, so it needs no confirmation: the History is the undo.
+func (s *Server) collectionGroupEdit(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Archive string  `json:"archive"`
+		Key     string  `json:"key"`
+		Title   *string `json:"title"`
+		// Collections: the group's new members (two or more), instead of a title
+		Collections []string `json:"collections"`
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+	if err == nil {
+		err = json.Unmarshal(body, &req)
+	}
+	a, k := strings.TrimSpace(req.Archive), strings.TrimSpace(req.Key)
+	ok := err == nil && a != "" && !strings.HasPrefix(a, "-") && !strings.ContainsAny(a, "\x00\r\n") && reCollName.MatchString(k)
+	args := []string{"--key=" + k}
+	if ok && req.Title != nil {
+		t := strings.TrimSpace(*req.Title)
+		ok = t != "" && !strings.ContainsAny(t, "\x00\r\n")
+		args = append(args, "--title="+t)
+	}
+	if ok && len(req.Collections) > 0 {
+		ok = req.Title == nil && len(req.Collections) >= 2
+		for _, c := range req.Collections {
+			ok = ok && reCollName.MatchString(c)
+		}
+		args = append(args, "--collections="+strings.Join(req.Collections, ","))
+	}
+	if !ok {
+		fail(w, http.StatusBadRequest, "a JSON body: archive, key, and a title to rename or collections to hold (none to ungroup)")
+		return
+	}
+	s.groupMu.Lock()
+	defer s.groupMu.Unlock()
+	raw, err := s.Backend.Call(context.WithoutCancel(r.Context()), 5*time.Minute, append([]string{"collectiongroupedit", managerPath(s.GOOS, a)}, args...)...)
+	s.cache.clear()
+	passJSON(w, raw, err, http.StatusConflict)
 }

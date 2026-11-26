@@ -68,16 +68,19 @@ function modelMark(model) {
   const n = MODEL_TIER[key];
   return `<span class="mm t${n}" role=img aria-label="${esc(word)}" title="${esc(word)}"><svg width=11 height=11 viewBox="0 0 12 12" aria-hidden=true>${RANK[n]}</svg></span>`;
 }
-// Run Definition: today's step list. In Configure each step is a button that opens its settings; the Read flow also holds the
-// switch that chains Suggest links on the same archive when a Read ends.
+// Run Definition: today's step list. In Configure each step is a button that opens its settings; the Basic flow also holds the
+// switch that chains Assemble on the same archive when a Basic run ends, and the Wikidata flow its Answer questions switch.
 function defHTML(ctx) {
   const c = state.cfg;
   const rows = ctx === 'cfg' ? (c && c.detail ? cfgFlowRows(c) : []) : (state.view && state.view.tab === 'run' ? runFlowRows(state.view) : []);
   if (!rows.length) return '';
   const click = ctx === 'cfg';
   const after = click && c.flow === 'read'
-    ? `<div class=chain><span class=chl>${modelMark('claude-sonnet-5-5')}<span>Suggest links</span></span><span class=dim>Run after Read</span>` +
-      `<button type=button class="sw2${c.on.after ? ' on' : ''}" role=switch aria-checked=${!!c.on.after} aria-label="Run after Read" data-switch=after></button></div>` : '';
+    ? `<div class=chain><span class=chl>${modelMark('claude-sonnet-5-5')}<span>Assemble</span></span><span class=dim>Run after Basic</span>` +
+      `<button type=button class="sw2${c.on.after ? ' on' : ''}" role=switch aria-checked=${!!c.on.after} aria-label="Run after Basic" data-switch=after></button></div>`
+    : click && c.flow === 'wikidata'                     // CZ318: the session answers its own Wikidata questions
+    ? `<div class=chain><span class=chl><span>Answer questions</span></span><span class=dim></span>` +
+      `<button type=button class="sw2${c.on.answer ? ' on' : ''}" role=switch aria-checked=${!!c.on.answer} aria-label="Answer questions" data-switch=answer></button></div>` : '';
   return `<ol class=fsl>${rows.map((s, i) => stepRow(s, i, click, click && c.step === s.key)).join('')}</ol>${after}`;
 }
 

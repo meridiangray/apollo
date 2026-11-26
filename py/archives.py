@@ -6,6 +6,8 @@
     collections(archive)              the archive's collections: name, records, counts by type, the sources cited, the run
                                       that added it and when (read through hydra's own readers, read only)
     records(archive, name, ...)       one collection's records, a page at a time
+    group_records(archive, key, ...)  a collection group's records (a Complex Collection: collections of several sources)
+    make_group(archive, names, title) a Complex Collection, as a hydra collection group (hydra's own collectionops)
     track(run, archive, names)        remember which run added which collections (state/collections.json)
     untrack(run)                      forget a run (a cleared run)
 
@@ -24,6 +26,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import settings
+
 HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 DRAFT_NAME = "Draft"
 DRAFT_PREFIX = "draft"
@@ -32,7 +36,7 @@ _LOCK = threading.Lock()
 
 
 def folder() -> Path:
-    return Path(os.environ.get("APOLLO_ARCHIVES") or HERE / "archives")
+    return settings.folder("folders.archives", HERE / "archives")          # APOLLO_ARCHIVES, then Settings
 
 
 def draft_path() -> Path:
@@ -226,7 +230,7 @@ _SCHEMA_LABELS = {"PublicBody": "Public body", "UnknownLink": "Link"}
 
 def schema_label(schema: str) -> str:
     """A type's display name: "GeoLink" is "Geo Link" (the same words the UI's type chips use)."""
-    return _SCHEMA_LABELS.get(schema) or re.sub(r"([a-z])([A-Z])", r" ", str(schema or ""))
+    return _SCHEMA_LABELS.get(schema) or re.sub(r"([a-z])([A-Z])", r"\1 \2", str(schema or ""))
 
 
 _SUMMARY: dict = {}
@@ -274,7 +278,44 @@ def collections(archive: str) -> dict:
                      "sources": s["sources"], "run": None if t.get("imported") else t.get("run") or own,
                      "imported": t.get("imported"), "added": added})
     rows.sort(key=lambda r: (r["added"], r["name"]))
-    return {"ok": True, "archive": str(arch), "name": meta.get("name") or arch.name, "draft": is_draft(arch), "collections": rows}
+    return {"ok": True, "archive": str(arch), "name": meta.get("name") or arch.name, "draft": is_draft(arch), "collections": rows,
+            "groups": _groups(meta, rows)}
+
+
+def _groups(meta: dict, rows: list[dict]) -> list[dict]:
+    """hydra.yaml's `collection_groups` (hydra's own reader) with what their collections hold: {name, title, collections,
+    count, types, sources, added}. A group whose collections come from several sources is a Complex Collection; the window
+    tells which (it places each collection under its source)."""
+    from hydra.archive import collmeta
+    by = {r["name"]: r for r in rows}
+    out = []
+    for key, g in collmeta.groups(meta).items():
+        members = [by[c] for c in dict.fromkeys(g["collections"]) if c in by]
+        if not members:
+            continue
+        types: dict = {}
+        for m in members:
+            for t in m["types"]:
+                types[t["schema"]] = types.get(t["schema"], 0) + t["n"]
+        out.append({"name": key, "title": g["title"], "collections": [m["name"] for m in members],
+                    "count": sum(m["count"] for m in members),
+                    "types": [{"schema": k, "label": schema_label(k), "n": n} for k, n in sorted(types.items(), key=lambda kv: (-kv[1], kv[0]))],
+                    "sources": sorted({s for m in members for s in m["sources"]}), "added": max(m["added"] for m in members)})
+    return out
+
+
+def _record_rows(arch: Path, recs: list[dict], titles: dict, names: dict, collection: str | None = None) -> list[dict]:
+    out = []
+    for r in recs:
+        props = r.get("properties") or {}
+        sid = _first(props, "sources")
+        row = {"id": r.get("id"), "schema": r.get("schema"), "type": schema_label(r.get("schema")),
+               "name": _first(props, "name", "title", "summary", "label") or names.get(r.get("id")) or _first(props, "role") or r.get("id"),
+               "source": titles.get(sid, sid) if sid else None, "quote": _first(props, "notes")}
+        if collection:
+            row["collection"] = collection
+        out.append(row)
+    return out
 
 
 def records(archive: str, name: str, offset: int = 0, limit: int = PAGE) -> dict:
@@ -287,12 +328,83 @@ def records(archive: str, name: str, offset: int = 0, limit: int = PAGE) -> dict
     recs = [r for r in (collections_io.read(collections_io.path(arch, name))[0] or []) if isinstance(r, dict)]
     import runview
     names = runview.archive_names(arch)                      # a link or tie is named by its two ends: "event → place"
-    out = []
-    for r in recs[max(0, offset):max(0, offset) + max(1, min(limit, 1000))]:
-        props = r.get("properties") or {}
-        sid = _first(props, "sources")
-        quote = _first(props, "notes")
-        out.append({"id": r.get("id"), "schema": r.get("schema"), "type": schema_label(r.get("schema")),
-                    "name": _first(props, "name", "title", "summary", "label") or names.get(r.get("id")) or _first(props, "role") or r.get("id"),
-                    "source": titles.get(sid, sid) if sid else None, "quote": quote})
-    return {"ok": True, "name": name, "total": len(recs), "offset": max(0, offset), "records": out}
+    page = recs[max(0, offset):max(0, offset) + max(1, min(limit, 1000))]
+    return {"ok": True, "name": name, "total": len(recs), "offset": max(0, offset), "records": _record_rows(arch, page, titles, names)}
+
+
+def group_records(archive: str, key: str, offset: int = 0, limit: int = PAGE) -> dict:
+    """A collection group's records from `offset`, collection after collection, each with the `collection` it is in (its card
+    and Trace stay tied to that collection and its source): {total, records}."""
+    from hydra.archive import collections_io, collmeta, manifest
+    arch = Path(archive)
+    g = collmeta.groups(manifest.read(arch)).get(key)
+    if not g:
+        return {"ok": False, "why": f"no collection group {key!r}"}
+    have = set(collections_io.names(arch))
+    parts = [(c, [r for r in (collections_io.read(collections_io.path(arch, c))[0] or []) if isinstance(r, dict)])
+             for c in dict.fromkeys(g["collections"]) if c in have]
+    total = sum(len(recs) for _, recs in parts)
+    titles = source_titles(arch)
+    import runview
+    names = runview.archive_names(arch)
+    lo, n = max(0, offset), max(1, min(limit, 1000))
+    out, at = [], 0
+    for c, recs in parts:
+        if len(out) >= n:
+            break
+        a, b = max(lo - at, 0), min(lo + n - at, len(recs))
+        if a < b:
+            out += _record_rows(arch, recs[a:b], titles, names, c)
+        at += len(recs)
+    return {"ok": True, "name": key, "total": total, "offset": lo, "records": out[:n]}
+
+
+def make_group(archive: str, names: list[str], title: str) -> dict:
+    """A Complex Collection: a hydra collection group (hydra.yaml `collection_groups`, through hydra's own collectionops,
+    which checks it, rebuilds and takes one history step) holding `names` under `title`. Its key is the title as a slug, made
+    unique among the groups. Nothing else changes: the collections and every other group stay as they are."""
+    from hydra.archive import collmeta, manifest
+    from hydra.records import collectionops
+    names = [str(n).strip() for n in dict.fromkeys(names or []) if str(n).strip()]
+    title = " ".join(str(title or "").split())
+    if len(names) < 2:
+        raise ValueError("a Complex Collection holds two collections or more")
+    if not title:
+        raise ValueError("a Complex Collection needs a title")
+    arch = Path(archive)
+    have = collmeta.groups(manifest.read(arch))
+    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    base = (base if len(base) <= 48 else base[:49].rsplit("-", 1)[0]).strip("-") or "complex"    # cut at a word
+    key, i = base, 2
+    while key in have:
+        key, i = f"{base}-{i}", i + 1
+    try:
+        got = collectionops.set_group(arch, key, names, title, confirm=True)
+    except collectionops.OpError as e:
+        raise ValueError(f"{e.why}; {e.do}") from None
+    return {"ok": True, "name": key, "title": got.get("title") or title, "collections": got.get("collections") or names}
+
+
+def edit_group(archive: str, key: str, title: str | None = None, collections: list[str] | None = None) -> dict:
+    """A Complex Collection renamed (`title`: the same key, the new title, through hydra's `set_group`), given other members
+    (`collections`: the same key and title, the new list) or, with neither, ungrouped (`set_group` with no collections removes
+    the group). Only the grouping changes: never a collection or a record."""
+    from hydra.archive import collmeta, manifest
+    from hydra.records import collectionops
+    arch = Path(archive)
+    g = collmeta.groups(manifest.read(arch)).get(key)
+    if not g:
+        raise ValueError(f"no collection group {key!r}")
+    if title is not None:
+        title = " ".join(str(title).split())
+        if not title:
+            raise ValueError("a Complex Collection needs a title")
+    names = [str(n).strip() for n in dict.fromkeys(collections or []) if str(n).strip()]
+    if collections is not None and len(names) < 2:
+        raise ValueError("a Complex Collection holds two collections or more")
+    keep = names if collections is not None else g["collections"] if title is not None else []
+    try:
+        got = collectionops.set_group(arch, key, keep, title, confirm=True)
+    except collectionops.OpError as e:
+        raise ValueError(f"{e.why}; {e.do}") from None
+    return {"ok": True, "name": key, "title": got.get("title") or g["title"], "collections": keep}

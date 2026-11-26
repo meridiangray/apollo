@@ -361,3 +361,44 @@ def test_brief_draft_asks_with_the_pages_and_record_and_returns_plain_lines(text
     monkeypatch.setattr(catalogue, "ask_model", lambda *a, **k: ({"brief": " "}, {}))
     with pytest.raises(ValueError):
         catalogue.brief_draft(text_source)
+
+
+def test_a_field_is_added_to_the_accepted_record_in_order_and_marked_edited(text_source, fake_claude):
+    catalogue.run(text_source, "haiku")
+    with pytest.raises(ValueError, match="no accepted"):
+        catalogue.add(text_source, "language", "", "x")
+    catalogue.act(text_source, "accept")
+    rec = catalogue.get(text_source)["accepted"]["record"]
+    key = next(k for k in catalogue.KEYS if k not in {i["key"] for i in rec} and k not in ("imprint", "declass"))
+    assert catalogue.add(text_source, key, "", "  added  text ")["ok"]
+    got = catalogue.get(text_source)["accepted"]["record"]
+    new = next(i for i in got if i["key"] == key)
+    assert new["value"] == "added text" and new["edited"] and [i["key"] for i in got] == sorted((i["key"] for i in got), key=catalogue.KEYS.index)
+    with pytest.raises(ValueError, match="already there"):
+        catalogue.add(text_source, key, "", "again")
+    with pytest.raises(ValueError, match="no such field"):
+        catalogue.add(text_source, "colour", "", "x")
+    with pytest.raises(ValueError, match="no such kind"):
+        catalogue.add(text_source, "title", "bogus", "x")
+    with pytest.raises(ValueError, match="text"):
+        catalogue.add(text_source, "language", "", "  ")
+    i = next(n for n, it in enumerate(got) if it["key"] == key)
+    assert catalogue.edit(text_source, i, "")["ok"] and not any(it["key"] == key for it in catalogue.get(text_source)["accepted"]["record"])
+
+
+def test_an_added_date_must_be_a_year_a_month_or_a_day(text_source, fake_claude):
+    catalogue.run(text_source, "haiku")
+    p = catalogue.get(text_source)["pending"]["record"]
+    kind = "date" if not any(i["key"] == "declass" and i["kind"] == "date" for i in p) else None
+    if kind is None:
+        catalogue.edit(text_source, next(n for n, i in enumerate(p) if i["key"] == "declass" and i["kind"] == "date"), "", pending=True)
+    for ok in ("1947", "1947-06", "1947-06-30"):
+        assert catalogue.add(text_source, "declass", "date", ok, pending=True)["ok"]
+        n = next(n for n, i in enumerate(catalogue.get(text_source)["pending"]["record"]) if i["key"] == "declass" and i["kind"] == "date")
+        catalogue.mark(text_source, n, True)                   # a rejected waiting field is replaced by the new one
+    for bad in ("June 1947", "1947-13", "1947-02-30", "47"):
+        with pytest.raises(ValueError, match="YYYY"):
+            catalogue.add(text_source, "declass", "date", bad, pending=True)
+    n = next(n for n, i in enumerate(catalogue.get(text_source)["pending"]["record"]) if i["key"] == "declass" and i["kind"] == "date")
+    with pytest.raises(ValueError, match="YYYY"):
+        catalogue.edit(text_source, n, "soon", pending=True)

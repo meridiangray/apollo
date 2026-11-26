@@ -75,8 +75,9 @@ def test_view_of_a_session_reads_its_archive_questions(scratch, tmp_path, brief)
     assert (v["open"], v["answered"], v["dismissed"]) == (1, 1, 0) and v["pages"] == []
     assert v["rows"][0] == {"id": "ask-1", "title": "Same person?", "labels": {}, "asked": None, "status": "open", "kind": "same-name", "page": 23,
                             "records": ["rec-1", "rec-2"], "question": "Same person?", "quote": "Ann met Ann.",
-                            "options": ["One", "Two"], "suggestion": "One", "answer": None}
-    assert v["rows"][1]["answer"] == {"choice": "1985", "text": None}
+                            "options": ["One", "Two"], "suggestion": "One", "answer": None, "group": "asked", "passage": {"text": "Ann met Ann.", "mark": None, "page": "23"},
+                            "choices": [{"choice": "1", "label": "One"}, {"choice": "2", "label": "Two"}]}
+    assert v["rows"][1]["answer"] == {"choice": "1985", "text": None, "by": None, "at": None}
     assert apollo.view(rec, "report") ["blocks"] == [] and apollo.view(rec, "report")["path"] is None
 
 

@@ -54,10 +54,10 @@ def test_the_context_names_the_run_and_only_real_archives(tmp_path):
     arc = tmp_path / "arc"
     arc.mkdir()
     (arc / "hydra.yaml").write_text("name: x\n")
-    facts = {"flow": "Read", "status": "done", "source": "pollard", "archive": str(arc)}
+    facts = {"flow": "Basic", "status": "done", "source": "pollard", "archive": str(arc)}
     lines = chat.context_lines({"view": "runs", "run": "r1", "archive": str(tmp_path / "not-one")}, lambda rid: facts)
     text = "\n".join(lines)
-    assert "the Runs view" in text and "Selected run: r1 (flow Read, status done, source pollard)." in text
+    assert "the Runs view" in text and "Selected run: r1 (flow Basic, status done, source pollard)." in text
     assert str(arc) in text and "not-one" not in text and "`archive`" in text
     assert "Selected run: r2." in chat.context_lines({"run": "r2"}, lambda rid: (_ for _ in ()).throw(OSError("x")))
 

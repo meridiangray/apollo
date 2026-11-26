@@ -159,7 +159,7 @@ const LONG_FIELDS = new Set(['summary', 'note', 'subject', 'contents']);
 // edited; a waiting record's value can also be rejected
 function catLine(it, i, slug, edit, pend, solo) {
   const long = LONG_FIELDS.has(it.key);
-  const rj = pend && !solo ? rejectBtn(i, it.rejected) : '';
+  const rj = pend ? (solo ? '' : rejectBtn(i, it.rejected)) : edit ? removeBtn(i) : '';
   const shown = catDisp(it.key, it.kind, it.value);
   const tip = [it.page ? `p. ${it.page}` : '', shown !== it.value ? it.value : ''].filter(Boolean).join(' · ');
   return `<div class="cline${long ? ' clamp' : ''}${edit ? ' inl' : ''}${it.rejected ? ' rej' : ''}"${edit ? ` data-edit=cat data-i="${i}" data-key="${esc(it.key)}" data-kind="${esc(it.kind || '')}"${pend ? ' data-pend=1' : ''}${long ? ' data-long=1' : ''} tabindex=0` : ''} data-v="${esc(it.value)}"${tip ? ` title="${esc(tip)}"` : ''}>${rj}${esc(shown)}</div>`;
@@ -187,6 +187,19 @@ function catDisp(key, kind, v) {
   return key === 'identifier' ? String(v == null ? '' : v) : capsFix(v);      // owner: no ALL CAPS anywhere in the catalogue; the printed form stays in the hover
 }
 const rejectBtn = (i, on) => `<button type=button class=rjm data-rej="${i}" aria-pressed=${!!on} aria-label="${on ? 'Restore' : 'Reject'}" title="${on ? 'Restore' : 'Reject'}">${ic('minus-circle')}</button>`;
+// an accepted value's minus removes it at once; adding it again brings it back
+const removeBtn = i => `<button type=button class=rjm data-del="${i}" aria-label=Remove title=Remove>${ic('minus-circle')}</button>`;
+// "+ Field": the fields of the record's kind that it does not hold yet, as [value, label] with value "key|kind"; none left, no button
+function catAddBtn(c, items, pend) {
+  const names = Object.fromEntries(c.fields.map(f => [f.key, f.name])), seen = new Set(items.filter(i => !(pend && i.rejected)).map(i => catLabel(i, names))), opts = [];
+  for (const f of c.fields) for (const kind of f.kinds.length ? f.kinds : ['']) {
+    const label = catLabel({key: f.key, kind}, names);
+    if (seen.has(label) || items.some(i => i.key === f.key && (i.kind || '') === kind && !(pend && i.rejected))) continue;
+    seen.add(label);
+    opts.push([`${f.key}|${kind}`, label]);
+  }
+  return opts.length ? `<button type=button class="btn sm" data-add=${pend ? 'pend' : 'acc'} data-opts="${esc(JSON.stringify(opts))}">+ Field</button>` : '';
+}
 // a value the card already shows elsewhere is not shown twice: a Title equal to the heading, a By that is only the Author's name
 function catRepeat(it, items, heading) {
   const n = catNorm(it.value);
@@ -222,7 +235,8 @@ function catAcceptedRows(slug) {
   if (!c || !c.accepted) return '';
   const a = c.accepted;
   const head = `<tr class=cathead><th colspan=2><span class=chip title="${esc(catTip(a))}">Catalogue</span>${modelMark(a.model)}</th></tr>`;
-  return head + catRows(c, a.record, slug, true);
+  const add = catAddBtn(c, a.record, false);
+  return head + catRows(c, a.record, slug, true) + (add ? `<tr class=catadd><td colspan=2>${add}</td></tr>` : '');
 }
 // a record waiting for Accept or Reject, with its check against what Apollo holds: one item per row, label above value
 function catPending(slug) {
@@ -235,7 +249,7 @@ function catPending(slug) {
   const check = '';                                            // owner: no Apollo / Record comparison here
   return `<div class=catpend><div class=cathead2><span class=chip title="${esc(catTip(p))}">Catalogue</span>${modelMark(p.model)}<span class=grow></span>` +
     `<button type=button class="btn primary sm" data-cat=accept>Accept</button><button type=button class="btn sm" data-cat=reject>Reject</button></div>` +
-    `<table class=infobox2><tbody>${catRows(c, p.record, slug, true, true)}</tbody></table>${check}</div>`;
+    `<table class=infobox2><tbody>${catRows(c, p.record, slug, true, true)}</tbody></table><div class=catadd>${catAddBtn(c, p.record, true)}</div>${check}</div>`;
 }
 // ---- the model: one constant pill at the top right of Sources, shaped like Hydra's chat enum ------------------------------
 function modelPill() {

@@ -231,6 +231,16 @@ def _pages_arg(folder: Path) -> str | None:
     return f"{p['from']}-{p['to']}" if isinstance(p, dict) and p.get("from") and p.get("to") else None
 
 
+def _window(rec: dict, status: dict) -> tuple[float, float] | None:
+    """(start, end) epoch seconds of a run (end: now while it has not ended); None when it has no start."""
+    try:
+        t0 = datetime.fromisoformat(str(rec["started"])).timestamp()
+        end = status.get("ended")
+        return (t0, datetime.fromisoformat(str(end).replace(" ", "T")).timestamp() if end else time.time())
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def ingest_run(rec: dict, status: dict | None = None, final: bool = False) -> dict:
     """Bring the run's rows up to date from its files. `status`: {status, detail, ended, exit_code} when it is known (the
     manager knows it; `running` otherwise). Idempotent: files are read from where the last ingest stopped, the run's
@@ -317,6 +327,7 @@ def ingest_run(rec: dict, status: dict | None = None, final: bool = False) -> di
                 con.execute("DELETE FROM ingest_state WHERE run_id=? AND file='transcript.jsonl'", [rid])
                 con.execute("INSERT INTO ingest_state VALUES (?,?,?,?)", [rid, "transcript.jsonl", size, len(s.rows)])
                 added["events"], added["hydra_calls"] = len(s.rows), len(s.calls)
+        files.window = _window(rec, status)                  # the archive's store holds every run's questions: this run's only
         qs = files.questions()
         con.execute("DELETE FROM questions WHERE run_id=?", [rid])
         for q in qs:

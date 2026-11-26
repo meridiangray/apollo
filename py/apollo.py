@@ -15,10 +15,13 @@
     apollo.py configs --legacy --json      the old flat list of configs and briefs
     apollo.py sourcelist | sourceadd PATH | sourceupdate SLUG --fields JSON | sourceremove SLUG    dropped sources
     apollo.py pagetext SOURCE PAGE         one page of a source's text (or one part of a text source)
-    apollo.py collections ARCHIVE [--collection NAME]    an archive's collections, or one collection's records
+    apollo.py collections ARCHIVE [--collection NAME | --group KEY]    an archive's collections, or one collection's (group's) records
+    apollo.py collectiongroup ARCHIVE --title T --collections A,B    a Complex Collection: a hydra collection group of several sources
+    apollo.py collectiongroupedit ARCHIVE --key K [--title T]    rename a Complex Collection (--title) or ungroup it
     apollo.py draft [--reset]              the Draft archive every session starts with (made empty if missing)
     apollo.py logdb --sql "<SELECT ...>"   the DuckDB log (state/apollo.duckdb, runlog.py), read-only; --rebuild ingests every run folder
     apollo.py proofreadstart|proofreadget|proofreadact   Proofread a PDF source's pages with Haiku and the page image (proofread.py)
+    apollo.py settings | settingsset --req64 B64 [--stdin]   the Settings page and one change to it (settings.py)
 
 A page-flow run is a recipe (the flow, pageflow/recipes/) on a source (pageflow/sources/): `start --recipe R --source S`
 composes them (pageflow/compose.py) with the pages and writes the effective config into the run folder. A `.yaml` given
@@ -55,6 +58,7 @@ import yaml
 
 HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import answering  # noqa: E402
 import archives  # noqa: E402
 import runfiles  # noqa: E402
 import runview  # noqa: E402
@@ -230,12 +234,12 @@ def parse_pages(pages: str | None):
     return a, b
 
 
-def default_budget(pages: int) -> float:
-    """The cost cap a run of `pages` pages starts with: $1 up to 11 pages, else about $0.045 a page (the full recipe's $5 over
-    its 107 pages) rounded up to the next $0.50, at least $1 and at most $5. The window's Cost cap field shows the same
-    number and lets the owner change it."""
-    import math
-    return max(1.0, min(5.0, math.ceil(pages * 0.045 / 0.5) * 0.5)) if pages > 11 else 1.0
+def default_budget(pages: int | None = None) -> float | None:
+    """The dollar cap a run starts with: none, unless the Settings page sets a Run cost (apollo.json `limits.run_usd`). Runs
+    have no other limit; a cap the person types for one run replaces this."""
+    import settings
+    fixed = settings.value("limits.run_usd")
+    return None if fixed is None else float(fixed)
 
 
 def _budget(v):
@@ -266,13 +270,16 @@ def composer():
 
 def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, budget=None, archive=None,
          recipe=None, source=None, rate=None, workflow=None, models=None, without=None, flow=None, lag=False,
-         after=None, scope=None, limits=True, for_source=None, agents=None) -> dict:
+         after=None, scope=None, limits=True, for_source=None, agents=None, answer=None) -> dict:
     """The run's record and files, decided; nothing written, nothing started. A page-flow run is a `recipe` on a `source`
     (composed here) or an already-composed `path` (.yaml); a session is a brief (.md) whose {archive}, {source} and
     {run_folder} are filled from `archive`, `source` (a source slug) and `rate` (the id of the run it rates).
     `for_source`: the source a workflow session was started for (recorded on the run; the brief does not see it).
-    `agents`: {haiku, sonnet, opus} counts for the flow (see agents_for); missing grades take the flow's default."""
+    `agents`: {haiku, sonnet, opus} counts for the flow (see agents_for); missing grades take the flow's default.
+    `answer`: the Wikidata and Assemble flows' Answer questions switch (the session may answer its own questions)."""
     final_root = root_for(dry)
+    if answer and (flow or workflow) not in ANSWERING:
+        raise ValueError("--answer goes with --flow wikidata or assemble")
     if flow:                                                 # the window's Flow select: read = the full recipe + the fields
         if flow not in FLOW_LABEL:
             raise ValueError(f"no flow {flow!r} (one of {', '.join(FLOW_LABEL)})")
@@ -301,6 +308,10 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
         import tools
         existing = str(tools.allowed_archive(str(archive)))
         archive = existing
+    if answer is None:                                       # Answer questions: on for Assemble unless the person turns it off
+        answer = (flow or workflow) == "assemble"
+    if flow in ENGINE_FLOWS:                                 # driven by pageflow/engine.py: no session
+        return engine_plan(flow, archive, source or for_source, pages, dry, name, counts, answer, models, final_root)
     if workflow:
         if workflow not in {w[0] for w in WORKFLOWS}:
             raise ValueError(f"no workflow {workflow!r} (one of {', '.join(w[0] for w in WORKFLOWS)})")
@@ -342,7 +353,7 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
             over = {"lag": lr["lag"], "authorized": lr["authorized"]}
         cfg = composer().compose(recipe, source, pages=pages, name=rid, root=final_root, overrides=over or None)
         if flow == "read" and budget is None:                    # the window's Cost cap default, by the pages of the run
-            budget = default_budget(cfg["pages"]["to"] - cfg["pages"]["from"] + 1)
+            budget = default_budget() if default_budget() is not None else "none"      # none: no cap
         if existing:
             composer().use_archive(cfg, existing)
     live = WS / "fleet-runs" / rid if fast else None
@@ -350,9 +361,12 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
     rec = {"id": rid, "name": name or (f"read-{source}" if flow else f"{recipe}-{source}" if recipe else path.stem),
            "kind": kind, "config": str(path),
            "recipe": recipe, "source": source, "dry": bool(dry), "fast": bool(fast), "flow": flow,
-           "opts": {"lag": bool(lag), "archive": existing, "without": without, "models": models, "after": after},
+           "opts": {"lag": bool(lag), "archive": existing, "without": without, "models": models, "after": after,
+                    **({"answer": bool(answer)} if answer or (flow or workflow) == "assemble" else {})},
            "run_folder": str(run_folder), "final_folder": str(final_root / "runs" / rid),
            "started": None, "pid": None, "pgid": None, "status": "starting", "files": {}}
+    if budget is None and workflow:                          # a session: the Settings cap only, else none
+        budget = default_budget()
     b = _budget(budget)
     if kind == "pageflow":
         prefix = (cfg.get("archive") or {}).get("prefix") or "archive"
@@ -426,6 +440,7 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
         client = json.loads(MCP_CLIENT.read_text(encoding="utf-8"))
         if fast:
             client["mcpServers"]["hydra"].update({"command": str(WS_PYTHON), "args": ["-m", "hydra_mcp.server"]})
+        client["mcpServers"]["hydra"].setdefault("env", {}).update(mcp_env())
         mcp_path, prompt = run_folder / "mcp.json", run_folder / "prompt.md"
         m = model or SESSION_MODEL
         head = [str(Path(__file__).resolve().with_name("drysession.py"))] if dry else []
@@ -451,14 +466,61 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
                                             run_folder=(rated or {}).get("run_folder"), workflow=workflow)
         if workflow == "wiki":
             text += scope_line(archive, scope)
-        if workflow == "links":
-            text += scope_line(archive, scope) + LINKS_BRIEF
+        if workflow in SCOPED:
+            text += scope_line(archive, scope) + (assemble_range(archive, source or for_source, pages, scope)
+                                                  if workflow == "assemble" else "") + flow_brief(workflow, answer)
         text += "".join(SUBAGENT_LINE.format(n=n, grade=g) for g, n in subs.items())
         rec["agents"] = counts
-        rec.update({"source": source or for_source, "rates": rated["id"] if rated else None,
+        own = scope_source(list(scope or []) or sorted(n for n, t in archives.tracked(str(archive)).items() if t.get("run")) if archive else []) \
+            if workflow == "wiki" or workflow in SCOPED else None
+        rec.update({"source": source or for_source or own, "rates": rated["id"] if rated else None,
                     "archive": archive or (rated or {}).get("archive")})
         rec["files"] = {str(mcp_path): json.dumps(client, indent=2) + "\n", str(prompt): text}
     return rec
+
+
+# The flows the engine drives (hydra-mcp-testing/pageflow/engine.py: gather, judge in chunks, check, stage, apply once): no
+# Claude Code session, no checklist for the model. Its progress is page heat in <run>/pageflow/progress.json, as Basic's.
+ENGINE_FLOWS = ("assemble", "refine", "timeline", "finance", "wikidata", "wiki", "places")
+
+
+def engine() -> Path:
+    return Path(os.environ.get("APOLLO_ENGINE") or TESTING / "pageflow" / "engine.py")
+
+
+def engine_grade(counts: dict | None) -> str:
+    """The model grade an engine run judges with: the strongest grade the person gave an agent to (Sonnet when none)."""
+    return next((g for g in ("opus", "sonnet", "haiku") if (counts or {}).get(g)), "sonnet")
+
+
+def engine_plan(flow: str, archive, source, pages, dry: bool, name, counts, answer: bool, models, final_root: Path) -> dict:
+    """An engine run's record: `engine.py run --flow F --archive A --source S` into <root>/runs/<id>, the page heat and the
+    report where Apollo reads a page flow's."""
+    if not archive:
+        raise ValueError(f"--flow {flow} goes with --archive")
+    if not source:                                           # none given: the source of the newest Basic run into this archive
+        basics = sorted((r for r in records() if r.get("kind") == "pageflow" and r.get("source") and r.get("archive")
+                         and Path(str(r["archive"])).resolve() == Path(str(archive)).resolve()),
+                        key=lambda r: str(r.get("started") or ""), reverse=True)
+        source = basics[0]["source"] if basics else None
+    if not source:
+        raise ValueError(f"--flow {flow} goes with --source: the source whose Basic run it reads after")
+    rid = new_id(name or f"{flow}-{source}", dry, False)
+    run_folder = final_root / "runs" / rid
+    grade = engine_grade(counts)
+    cmd = [driver_python(), str(engine()), "run", "--flow", flow, "--archive", str(archive), "--source", str(source),
+           "--root", str(final_root), "--name", rid, "--grade", grade, *(["--pages", str(pages)] if pages else []),
+           *(["--dry"] if dry else []), *(["--no-answers"] if flow == "assemble" and not answer else []),
+           *(["--models", models] if models else [])]
+    return {"id": rid, "name": name or f"{flow}-{source}", "kind": "engine", "config": str(engine()), "recipe": None,
+            "source": source, "dry": bool(dry), "fast": False, "flow": flow,
+            "opts": {"lag": False, "archive": str(archive), "without": None, "models": models, "after": None,
+                     **({"answer": bool(answer)} if flow == "assemble" else {})},
+            "run_folder": str(run_folder), "final_folder": str(run_folder), "started": None, "pid": None, "pgid": None,
+            "status": "starting", "files": {}, "model": ((models and dict(p.split("=", 1) for p in models.split(","))) or {}).get(grade)
+            or {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}[grade],
+            "archive": str(archive), "budget_usd": None, "agents": counts, "command": cmd, "cwd": str(engine().parent),
+            "io": {"stdin": None, "stdout": str(run_folder / "driver.log")}}
 
 
 # What a start's `agents` come to: {haiku, sonnet, opus} for the flow's grades (runview.FLOW_SPEC), missing ones at the default.
@@ -474,7 +536,7 @@ def grade_of(model: str | None) -> str:
 def agents_for(flow: str, agents: dict | None) -> dict:
     """The agent counts of a run of `flow`: the flow's grades only, each an integer from 0 (Read: from 1) up to its max,
     default when not given. A grade the flow cannot use must be missing or 0."""
-    spec = (runview.FLOW_SPEC.get(flow) or {}).get("grades") or {}
+    spec = runview.flow_grades(flow)                         # the defaults as Settings left them
     given = dict(agents or {})
     for g, v in given.items():
         if g not in runview.GRADES:
@@ -513,15 +575,111 @@ def parse_agents(text: str | None) -> dict | None:
     return out
 
 
-LINKS_BRIEF = (
-    "\nThe whole job, not a sample: links_sweep handles every open suggestion of these collections (Merge, Resolve, "
-    "casts) in one call; run it with confirm=true (the task authorizes it). Within one source a short form the page names "
-    "one candidate for is merged on that passage; two candidates are a question. Wikidata matching is on: the person asks "
-    "for it. The task's count step ticks only when suggestions left unhandled = 0; do not stop before it does.\n")
+# What each scoped workflow's session is told beside the brief: the tools the task authorizes and the count it must reach.
+FLOW_BRIEFS = {
+    "assemble": (
+        "\nThe whole job, not a sample: assemble handles every open Merge, Resolve and cast of these collections in one "
+        "call; run it with confirm=true. Within one source a short form "
+        "the page names one candidate for is merged on that passage; two candidates are a question. The task's count step "
+        "ticks only when suggestions left unhandled = 0; do not stop before it does.\n"),
+    "timeline": (
+        "\nCreate the task with views=[] and authorized=[\"run_check\"]: its own steps end with the Timeline view's check. "
+        "Record only the dates a kept sentence states, at the precision written; ask the person about dates that disagree. "
+        "The task's count step ticks only when date findings left = 0; do not stop before it does.\n"),
+    "wikidata": (
+        "\nThe whole job, not a sample: wikidata_sweep matches every person, company and place of these collections in one "
+        "call; run it with confirm=true. The task's count step ticks only when entities left unhandled = 0; do not stop "
+        "before it does.\n"),
+    "finance": (
+        "\nCreate the task with authorized=[\"run_check\"]. Record only what a kept sentence states; an amount without its "
+        "currency or date stays as written. The task's count step ticks only when amount findings left = 0; do not stop "
+        "before it does.\n"),
+}
+ANSWER_ON = {
+    "wikidata": ("Answer questions is on: create the task with authorized=[\"wikidata_sweep\", \"wikidata_decide\"] and, in step "
+                 "W1, answer each question the pass asked with wikidata_decide: accept the item that fits the kept source, reject "
+                 "all when none fits, leave only a split case.\n"),
+    "assemble": ("Answer questions is on: create the task with authorized=[\"assemble\", \"answer\", \"save_source_note\"] and, in step F1 "
+                 "(the final review), decide each question the run asked (`ask-`), each build merge or reference question and each "
+                 "same-name pair about the run's own records, from the pages you read and the context note: "
+                 "answer through `answer` with the sentence word for word as `quote` and its `source`. A sentence that shows two "
+                 "are different is an answer too: \"Mr. Rockefeller\" is the Rockefeller the passage around it names. Leave "
+                 "open only what the text truly does not settle. A name alone never settles it.\n"),
+}
+ANSWER_OFF = {
+    "wikidata": ("Answer questions is off: create the task with authorized=[\"wikidata_sweep\"]; skip step W1, the questions "
+                 "wait for the person.\n"),
+    "assemble": ("Answer questions is off: create the task with authorized=[\"assemble\", \"save_source_note\"]; skip step F1, "
+                 "the questions wait for the person. In step Q2 say plainly how many questions wait for the person.\n"),
+}
+ANSWERING = tuple(ANSWER_ON)                                 # the flows with an Answer questions switch
+
+
+def flow_brief(workflow: str, answer: bool = False) -> str:
+    """The lines a scoped workflow's prompt adds after its collections."""
+    text = FLOW_BRIEFS.get(workflow, "")
+    if workflow in ANSWERING:
+        text += (ANSWER_ON if answer else ANSWER_OFF)[workflow]
+    return text
+
+
+# No run token cap: Claude Code caps one MCP tool reply at 25,000 tokens unless MAX_MCP_OUTPUT_TOKENS raises it, and a read of many
+# pages must fit. hydra-mcp's read size (HYDRA_MCP_READ_CHARS: read_source and read_file) follows its own one setting.
+MCP_OUTPUT_TOKENS = "100000"
+# A read reply of 200k chars was persisted to a file by Claude Code and came back as a 2 KB preview (Assemble, 2026-11-26);
+# replies of about 33k chars came back inline in an earlier run. 40k stays at that size.
+READ_CHARS = "40000"
+
+
+def mcp_env() -> dict:
+    """What every hydra-mcp server a run starts is told: one read size."""
+    return {"HYDRA_MCP_READ_CHARS": os.environ.get("HYDRA_MCP_READ_CHARS") or READ_CHARS}
+
+
+def run_env() -> dict:
+    """The environment of the process a run starts (`claude -p` or the page-flow driver)."""
+    return {**os.environ, "PYTHONUNBUFFERED": "1", "PAGEFLOW_SOURCES_EXTRA": sources_extra(),
+            "MAX_MCP_OUTPUT_TOKENS": os.environ.get("MAX_MCP_OUTPUT_TOKENS") or MCP_OUTPUT_TOKENS, **mcp_env(),
+            "PATH": f"{HOME / '.local' / 'bin'}:{os.environ.get('PATH', '/usr/bin:/bin')}"}
+
+
+def source_pages(source: str | None, archive) -> list[int]:
+    """The pages of `source` read into `archive` so far: the union of the content pages of every page-flow run on that
+    source and archive (a skipped or redacted page is not read)."""
+    out: set[int] = set()
+    for r in records():
+        if r.get("kind") != "pageflow" or not source or r.get("source") != source:
+            continue
+        if archive and r.get("archive") and str(r["archive"]) != str(archive):
+            continue
+        out.update(runfiles.content_pages(runfiles.read_json(Path(r["run_folder"]) / "pageflow" / "progress.json")))
+    return sorted(out)
+
+
+def assemble_range(archive, source: str | None, pages: str | None = None, scope=None) -> str:
+    """What an Assemble run covers: the source it is for and its pages, the range the person set (`pages`, A-B) or every page
+    read into the archive so far. Not only the last run's collections."""
+    source = source or scope_source(list(scope or []) or sorted(n for n, t in archives.tracked(str(archive)).items() if t.get("run"))
+                                    if archive else [])
+    if not source:
+        return "\nSource: none is named; ask the person which source and which pages to assemble before you start.\n"
+    title = known_sources().get(source) or source
+    if pages:
+        a, z = parse_pages(pages)
+        covered, how = f"{a}-{z}" if z != a else str(a), "the range the person set"
+    else:
+        read = source_pages(source, archive)
+        covered, how = (toolargs_compact(read) if read else ""), "every page read into this archive so far"
+    if not covered:
+        return (f"\nSource: {source} ({title}). No page of it was read into this archive yet; ask the person for a page range "
+                "before you start.\n")
+    return (f"\nSource: {source} ({title}); find its id with `sources`. Pages to cover: {covered} ({how}). This run is the "
+            "whole range, not only the last run's collections: read it in order before you merge anything, and keep the source's "
+            "context note for the next agent.\n")
 
 
 def scope_line(archive, scope=None) -> str:
-    """The links workflow works on the entities of the collections a run added: those named, else every collection a run added
+    """A scoped workflow works on the entities of the collections a run added: those named, else every collection a run added
     to this archive (state/collections.json); an imported one is not a run's."""
     names = list(scope or [])
     if not names and archive:
@@ -531,12 +689,20 @@ def scope_line(archive, scope=None) -> str:
     return f"\nCollections (the run's own; work on their entities only): {', '.join(names)}\n"
 
 
+def scope_source(names) -> str | None:
+    """The one source slug all these collections belong to (a collection's name is its source's slug or starts with it and a
+    dash: the rule the Collections rail uses), else None."""
+    slugs = list(known_sources())
+    homes = {max((s for s in slugs if n == s or n.startswith(s + "-")), key=len, default=None) for n in names}
+    return homes.pop() if len(homes) == 1 and None not in homes else None
+
+
 def start(path=None, name=None, model=None, dry=False, fast=False, pages=None, budget=None, archive=None,
           recipe=None, source=None, rate=None, workflow=None, models=None, without=None, flow=None, lag=False,
-          after=None, scope=None, limits=True, for_source=None, agents=None) -> dict:
+          after=None, scope=None, limits=True, for_source=None, agents=None, answer=None) -> dict:
     """Write the run's files and registry entry, then start its wrapper in a new session. Returns the record."""
     rec = plan(path, name, model, dry, fast, pages, budget, archive, recipe, source, rate, workflow, models, without,
-               flow, lag, after, scope, limits, for_source, agents)
+               flow, lag, after, scope, limits, for_source, agents, answer)
     for f, text in rec["files"].items():
         Path(f).parent.mkdir(parents=True, exist_ok=True)
         Path(f).write_text(text, encoding="utf-8")
@@ -545,6 +711,7 @@ def start(path=None, name=None, model=None, dry=False, fast=False, pages=None, b
     rec["files"] = sorted(rec["files"])
     rec["started"] = datetime.now().isoformat(timespec="seconds")
     save(rec)
+    Path(rec["run_folder"]).mkdir(parents=True, exist_ok=True)              # an engine run writes no file before it starts
     log = open(Path(rec["run_folder"]) / "fleet-exec.log", "ab")
     p = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "exec", rec["id"]], cwd=rec["run_folder"],
                          stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
@@ -561,8 +728,9 @@ def start(path=None, name=None, model=None, dry=False, fast=False, pages=None, b
 def final_status(rec: dict, code: int | None, stopped: bool) -> tuple[str, str]:
     """(status, detail): done | stopped | failed, and the run's own word for it."""
     folder = Path(rec["run_folder"])
-    if rec["kind"] == "pageflow":
-        st = (runfiles.read_json(folder / "pageflow" / "state.json", {}) or {}).get("status") or ""
+    if rec["kind"] in ("pageflow", "engine"):              # an engine run keeps its state beside its stage: <run>/<flow>/
+        sub = rec.get("flow") if rec["kind"] == "engine" else "pageflow"
+        st = (runfiles.read_json(folder / str(sub) / "state.json", {}) or {}).get("status") or ""
         if stopped:
             return "stopped", st or f"signal (exit {code})"
         if st == "done":
@@ -654,14 +822,14 @@ def logdb(a) -> dict:
 
 
 def chain(rec: dict) -> None:
-    """A Read that ended well starts Links on the same archive (its Run after Read switch), for the collections it added."""
+    """A Read that ended well starts Assemble on the same archive (its Run after Read switch), for the collections it added."""
     arch = rec.get("archive")
     if not arch or not archives.is_archive(arch):
         return
     names = [n for n, t in archives.tracked(str(arch)).items() if t.get("run") == rec["id"]]
-    nxt = start(archive=str(arch), workflow="links", dry=bool(rec.get("dry")), scope=names, name=f"links-{rec['source'] or rec['id']}",
+    nxt = start(archive=str(arch), workflow="assemble", dry=bool(rec.get("dry")), scope=names, name=f"assemble-{rec['source'] or rec['id']}",
                 for_source=rec.get("source"))
-    print(f"{time.strftime('%H:%M:%S')} started Links: {nxt['id']}", flush=True)
+    print(f"{time.strftime('%H:%M:%S')} started Assemble: {nxt['id']}", flush=True)
 
 
 PREP_WAIT = 6 * 3600                                          # seconds a source's OCR or Text may take before the run goes on without it
@@ -757,8 +925,7 @@ def execute(rid: str) -> int:
         stopping["at"] = stopping["at"] or time.time()
     signal.signal(signal.SIGTERM, on_term)
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
-    env = {**os.environ, "PYTHONUNBUFFERED": "1", "PAGEFLOW_SOURCES_EXTRA": sources_extra(),
-           "PATH": f"{HOME / '.local' / 'bin'}:{os.environ.get('PATH', '/usr/bin:/bin')}"}
+    env = run_env()
     code, copied = None, {}
     if rec.get("fast"):
         print(f"{time.strftime('%H:%M:%S')} sync the mirror", flush=True)
@@ -808,7 +975,7 @@ def execute(rid: str) -> int:
     try:
         if finish_archive(rec):                              # it noted collections: the log's `collections` rows follow
             log_run(rid)
-        if status == "done" and (rec.get("opts") or {}).get("after") == "links":
+        if status == "done" and (rec.get("opts") or {}).get("after") in ("assemble", "links"):   # links: a Read started before the rename
             chain(rec)
     except Exception as e:                                   # noqa: BLE001 - the run is over; this follow-up never changes how it ended
         print(f"{time.strftime('%H:%M:%S')} archive follow-up failed: {e}", flush=True)
@@ -887,7 +1054,7 @@ def _now(rec: dict, files: runfiles.RunFiles, status: str, detail: str, elapsed,
          calls: list[dict]) -> str:
     """The plain sentence on what the run is doing (runview.now_line)."""
     wf = rec.get("workflow") or (rec.get("name", "")[len("workflow-"):] if str(rec.get("name", "")).startswith("workflow-") else None)
-    if rec["kind"] != "pageflow":
+    if rec["kind"] not in ("pageflow", "engine"):
         return runview.now_line(rec["kind"], status, detail, None, {}, 0, None, elapsed, None, len(calls), wf)
     found = files.found()
     records = len({(r.get("schema"), r.get("thing")) for r in found})
@@ -930,7 +1097,17 @@ def run_source(rec: dict) -> str | None:
         return rec["source"]
     name = str(rec.get("name") or "")
     hits = [slug for slug in known_sources() if name.endswith("-" + slug)]
-    return max(hits, key=len) if hits else None
+    if hits:
+        return max(hits, key=len)
+    for folder in (rec.get("run_folder"), rec.get("final_folder")):      # a run started before its source was recorded: its prompt names the collections
+        try:
+            text = (Path(str(folder)) / "prompt.md").read_text(encoding="utf-8") if folder else ""
+        except OSError:
+            continue
+        m = re.search(r"^Collections \(the run's own[^)]*\): (.+)$", text, re.M)
+        if m:
+            return scope_source([n.strip() for n in m.group(1).split(",") if n.strip()])
+    return None
 
 
 def archive_name(rec: dict) -> str | None:
@@ -964,6 +1141,12 @@ def run_window(rec: dict, ex: dict | None = None) -> tuple[float, float] | None:
     return (t0, t1)
 
 
+def _workflow_pages(rec: dict, files: runfiles.RunFiles, ex: dict) -> dict:
+    """{cells, heat} of a finished workflow run on its source's pages (entitytrace.run_pages; worked out once per run)."""
+    import entitytrace
+    return entitytrace.run_pages(rec["id"], files.archive(), run_source(rec), source_title(rec), rec.get("started"), ex.get("ended"))
+
+
 def summary(rec: dict, files: runfiles.RunFiles | None = None, full: bool = False) -> dict:
     """The run as stable JSON (`ls --json` rows; `status --json` with full=True). Keys never change meaning; new keys
     may be added."""
@@ -995,11 +1178,13 @@ def summary(rec: dict, files: runfiles.RunFiles | None = None, full: bool = Fals
     for v in ((p or {}).get("pages") or {}).values():
         pages[v] = pages.get(v, 0) + 1
     chunk, cells, read, content = None, [], 0, 0
-    if rec["kind"] == "pageflow":
+    if rec["kind"] in ("pageflow", "engine"):                # an engine run: page heat as a page flow writes it
         cells = runfiles.cells(p, files.found())
         content = len(runfiles.content_pages(p))
         read = sum(1 for _, st, _ in cells if st in ("done", "escalated", "gave-up"))
-        chunk = runfiles.route(trace, p, _flush(rec, files), status == "done")["chunk"]
+        chunk = runfiles.route(trace, p, _flush(rec, files), status == "done")["chunk"] if rec["kind"] == "pageflow" else None
+    elif rec["kind"] == "mcp-session" and ex:                # a finished workflow run: its scope on the source's pages
+        cells = _workflow_pages(rec, files, ex)["cells"]
     out = {
         "schema": SCHEMA, "id": rec["id"], "name": rec.get("name"), "kind": rec["kind"], "model": rec.get("model"),
         "status": status, "detail": detail, "alive": live, "pid": rec.get("pid"), "dry": rec.get("dry", False),
@@ -1015,7 +1200,7 @@ def summary(rec: dict, files: runfiles.RunFiles | None = None, full: bool = Fals
         "cells": cells,
         "calls": {"hydra": sum(bool(c.get("hydra", True)) for c in calls),
                   "errors": sum(c.get("ok") is False for c in calls),
-                  "model": files.model_calls() if rec["kind"] == "pageflow" else None},
+                  "model": files.model_calls() if rec["kind"] in ("pageflow", "engine") else None},
         "cost": {**cost, "budget_usd": rec.get("budget_usd")},
         "limits": limits_of(rec), "resumable": resumable(rec) is None,
         "last": last[0] if last else "",
@@ -1266,7 +1451,7 @@ def _live_flow(rec: dict, files: runfiles.RunFiles, trace: list[dict], p: dict |
                 elif x["label"] == "Hard pages" and (cfg.get("budgets") or {}).get("escalations") == 0:
                     x["on"] = False
             rt = runfiles.route(trace, p, _flush(rec, files), status == "done")
-            return {"flow": {"title": "Read", "steps": runview.flow_steps(steps, rt, trace, files.state(), status == "done", cfg)},
+            return {"flow": {"title": "Basic", "steps": runview.flow_steps(steps, rt, trace, files.state(), status == "done", cfg)},
                     "config": runview.config_rows(cfg, rec, files.state())}
         wf = rec.get("workflow") or str(rec.get("name") or "").removeprefix("workflow-")
         steps = recipe_detail_cached("full", None)["flows"].get(wf) or []
@@ -1297,7 +1482,9 @@ def view(rec: dict, tab: str = "run", files: runfiles.RunFiles | None = None, ro
         ex = exit_info(rec["id"]) or {}
         out["route"] = runfiles.route(files.trace(), p, _flush(rec, files), ex.get("status") == "done")
         if tab in ("run", "report", "found"):              # Found draws the Records row and the Named row (owner: the 24 Nov sketch)
-            out["heat"] = runfiles.heat(p, files.state(), files.found())
+            out["heat"] = runfiles.heat(p, files.state(), files.found(), files.questions())
+    elif rec["kind"] == "mcp-session" and tab in ("run", "report", "found"):
+        out["heat"] = _workflow_pages(rec, files, exit_info(rec["id"]) or {})["heat"]
     if row is not None:                                      # what one log row stands for
         trace = files.trace()
         links = runview.trace_links(trace, files.found(), files.models())
@@ -1316,11 +1503,12 @@ def view(rec: dict, tab: str = "run", files: runfiles.RunFiles | None = None, ro
         out.update(runfiles.found_groups(files.found()))
         out.update(runview.found_entities(runview.named(files.found(), rec.get("archive"))))   # ids said by name
         if rec["kind"] != "pageflow":                        # a workflow run found nothing: it changed what its tasks recorded
-            out["changes"] = runfiles.workflow_changes(files.archive(), files.window)
+            out["changes"] = runfiles.workflow_changes(files.archive(), files.window, files.swept())
     elif tab == "raw":
         out["raw"] = runview.raw_view(files, rec["kind"])
     elif tab == "questions":
-        out.update(runfiles.question_rows(files.questions(), runview.archive_names(files.archive())))
+        out.update(runfiles.question_rows(files.questions(), runview.archive_names(files.archive()),
+                                          answering.build_rows(files.archive(), answering.run_collections(rec), runview.archive_names(files.archive()))))
     elif tab == "calls":
         out.update(runfiles.calls_view(files.calls()))
     else:
@@ -1374,7 +1562,8 @@ def recipes_and_sources() -> dict:
     d = archives.draft_path()
     return {"recipes": recipes, "sources": sources, "briefs": briefs,
             "flows": runview.flow_catalogue(),
-            "draft": {"path": str(d), "exists": archives.is_archive(d), "name": archives.DRAFT_NAME}}
+            "draft": {"path": str(d), "exists": archives.is_archive(d), "name": archives.DRAFT_NAME,
+                      "records": sum(c["count"] for c in archives.collections(str(d))["collections"]) if archives.is_archive(d) else 0}}
 
 
 def describe(path: Path) -> str:
@@ -1411,9 +1600,13 @@ WIKI_BRIEF = HERE / "briefs" / "wiki.md"                      # the Wiki flow: t
 WORKFLOWS = [("stubs", "Stubs", "Turns names that have no entry yet into entries when a source backs them up."),
              ("places", "Places", "Puts the archive's people and things on the map from what their sources say."),
              ("enrich", "Enrich", "Adds more facts to chosen entries from new sources and Wikidata."),
-             ("wiki", "Wiki", "Names and groups the archive's collections, then gets each one ready for the views it should show in."),
-             ("links", "Links", "Goes through the entities a run added and links, merges or parents the ones a kept source supports; the rest become questions.")]
-AFTER = ("links",)                                           # what a Read may chain on its own archive when it ends
+             ("wiki", "Curate", "Names and groups the archive's collections, then gets each one ready for the views it should show in."),
+             ("assemble", "Assemble", "Puts a run's entities together as one graph: merges what a kept source settles across pages, adds parents, and reports open ends and the graph's shape."),
+             ("timeline", "Timeline", "Dates a run's events and ties as their sources state them and gets the collections ready for the Timeline view."),
+             ("wikidata", "Wikidata", "Matches a run's people, companies and places to Wikidata; each match becomes a question, answered here when Answer questions is on."),
+             ("finance", "Finance", "Records the securities, holdings, payments and debts a run's sources state, with amount, currency and date.")]
+AFTER = ("assemble",)                                        # what a Read may chain on its own archive when it ends
+SCOPED = ("assemble", "timeline", "wikidata", "finance")     # the workflows that work on a run's own collections
 
 
 def prompt_names() -> list[str]:
@@ -1473,7 +1666,7 @@ def scaled_caps(cp, recipe: str, source: str) -> dict | None:
 
 
 # a flow that runs several hydra workflows in one session: its key -> the workflows, in order
-WORKFLOW_PARTS = {"wiki": ("collection-shape", "view-prep")}
+WORKFLOW_PARTS = {"wiki": ("collection-shape", "view-prep"), "links": ("wikidata",)}   # links: renamed, for old runs
 
 
 def workflow_steps(key: str) -> list[str]:
@@ -1598,7 +1791,7 @@ def recipe_detail(name: str, source: str | None = None) -> dict:
     stages = [
         {"key": "analyse", "label": "Analyse", "kind": "analyse", "about": "Measures the source page by page without using any model.", "role": None, "model": None, "budget": "No model calls", "on": True,
          "toggle": False, "prompts": []},
-        {"key": "read", "label": "Read", "kind": "flow", "about": 'Reads every page of the source and builds a new archive from what it finds.', "role": "haiku", "model": haiku, "budget": (f"Stops at ${r['budget_usd']:g} and writes the report" if r.get("budget_usd") is not None else "No dollar cap"),
+        {"key": "read", "label": "Basic", "kind": "flow", "about": 'Reads every page of the source and builds a new archive from what it finds.', "role": "haiku", "model": haiku, "budget": (f"Stops at ${r['budget_usd']:g} and writes the report" if r.get("budget_usd") is not None else "No dollar cap"),
          "on": True, "toggle": False, "prompts": ["A", "C", "T", "I"]},
         {"key": "escalate", "label": "Escalate", "kind": "flow", "hidden": True, "about": 'When a page fails its checks twice, a stronger model retries that page.', "role": "sonnet", "model": sonnet,
          "budget": per("sonnet_per_page", "calls"), "on": True, "toggle": False, "prompts": ["A", "C", "T"]},
@@ -1743,7 +1936,7 @@ def serve() -> int:
         buf, code = io.StringIO(), 0
         try:
             args = json.loads(line)["args"]
-            if not isinstance(args, list) or not all(isinstance(a, str) for a in args) or args[:1] in (["serve"], ["exec"], ["toolrun"], ["proofreadrun"]) or (args[:1] == ["logdb"] and "--rebuild" in args):
+            if not isinstance(args, list) or not all(isinstance(a, str) for a in args) or args[:1] in (["serve"], ["exec"], ["toolrun"], ["proofreadrun"], ["settingsset"]) or (args[:1] == ["logdb"] and "--rebuild" in args):
                 raise ValueError("bad request")
             with contextlib.redirect_stdout(buf):
                 code = main(args)
@@ -1777,9 +1970,11 @@ def main(argv=None) -> int:
     s.add_argument("--workflow", help="session: a hydra workflow (review, stubs, places, enrich, view-prep, close-out) on --archive")
     s.add_argument("--models", help="page flow: role=model,... (the recipe's model roles: haiku, sonnet)")
     s.add_argument("--without", help="page flow: roles to leave out (lag, rate, supervise, escalate)")
-    s.add_argument("--flow", help="read (the page flow on --source), or stubs, places, enrich, wiki (a workflow on --archive)")
+    s.add_argument("--flow", help="read (the page flow on --source), or a flow on --archive: assemble, refine, timeline (the engine), or a workflow session: places, stubs, enrich, wikidata, finance, wiki")
     s.add_argument("--lag", action="store_true", help="--flow read: the lag-check on")
-    s.add_argument("--after", help="--flow read: a workflow to run on the same archive when the run ends (links)")
+    s.add_argument("--after", help="--flow read: a workflow to run on the same archive when the run ends (assemble)")
+    s.add_argument("--answer", action="store_true", help="--flow wikidata or assemble: the session answers its own questions (Answer questions; on by default for assemble)")
+    s.add_argument("--no-answer", action="store_true", help="--flow assemble: Answer questions off, the questions wait for the person")
     s.add_argument("--no-limits", action="store_true", help="page flow: no run-level caps (calls, escalations, dollars)")  # limits
     s.add_argument("--agents", help="--flow: agents per model grade, haiku=N,sonnet=N,opus=N (missing: the flow's default)")
     s.add_argument("--json", action="store_true")
@@ -1828,8 +2023,15 @@ def main(argv=None) -> int:
     s.add_argument("--group", choices=["people", "bodies", "places", "events", "ties", "posts"], help="with --all: one group only")
     s.add_argument("--json", action="store_true")
     # end pageview
+    # answering
+    s = sub.add_parser("answer", help="one click on a question: its choice (an option's number, confirm, reject, none, dismiss), or clear to take the answer back")
+    s.add_argument("id")
+    s.add_argument("--question", required=True)
+    s.add_argument("--choice", required=True)
+    s.add_argument("--json", action="store_true")
+    # end answering
     # export
-    s = sub.add_parser("export", help="write a finished run's results (what it found and saved) to <run folder>/exports/ as .json or .jsonl")
+    s = sub.add_parser("export",help="write a finished run's results (what it found and saved) to <run folder>/exports/ as .json or .jsonl")
     s.add_argument("id", nargs="?")
     s.add_argument("--id", dest="id_opt")
     s.add_argument("--format", choices=["json", "jsonl"], default="jsonl")
@@ -1931,7 +2133,13 @@ def main(argv=None) -> int:
     s.add_argument("--index", type=int, required=True)
     s.add_argument("--value", default="")
     s.add_argument("--pending", action="store_true", help="edit the record waiting for Accept")
-    s = sub.add_parser("cataloguemark", help="reject (or restore) one field of the waiting Catalogue record before Accept")
+    s = sub.add_parser("catalogueadd", help="add one field (key, kind, value) to the accepted Catalogue record, or (--pending) to the one waiting for Accept")
+    s.add_argument("--source", required=True)
+    s.add_argument("--key", required=True)
+    s.add_argument("--kind", default="")
+    s.add_argument("--value", required=True)
+    s.add_argument("--pending", action="store_true", help="add to the record waiting for Accept")
+    s = sub.add_parser("cataloguemark",help="reject (or restore) one field of the waiting Catalogue record before Accept")
     s.add_argument("--source", required=True)
     s.add_argument("--index", type=int, required=True)
     s.add_argument("--rejected", type=int, required=True, choices=(0, 1))
@@ -1959,8 +2167,18 @@ def main(argv=None) -> int:
     s = sub.add_parser("collections", help="an archive's collections, or one collection's records")
     s.add_argument("archive")
     s.add_argument("--collection")
+    s.add_argument("--group")
     s.add_argument("--offset", type=int, default=0)
     s.add_argument("--limit", type=int, default=archives.PAGE)
+    s = sub.add_parser("collectiongroup", help="a Complex Collection: a hydra collection group of collections from several sources")
+    s.add_argument("archive")
+    s.add_argument("--title", required=True)
+    s.add_argument("--collections", required=True, help="comma-separated collection names")
+    s = sub.add_parser("collectiongroupedit", help="a Complex Collection renamed (--title) or ungrouped (no --title)")
+    s.add_argument("archive")
+    s.add_argument("--key", required=True)
+    s.add_argument("--title")
+    s.add_argument("--collections", help="comma-separated: the group's new members")
     s = sub.add_parser("draft", help="the Draft archive: make it empty if it is missing; --reset deletes and makes it again")
     s.add_argument("--reset", action="store_true")
     s = sub.add_parser("chatstart", help="the chat bubble: start a reply ({messages, model, context} as base64 JSON); returns at once")  # chat
@@ -1976,20 +2194,29 @@ def main(argv=None) -> int:
     s.add_argument("--source")
     s.add_argument("--title", default="")
     s.add_argument("--json", action="store_true")
+    sub.add_parser("settings", help="the Settings page: models and keys (never a value), defaults, limits, folders, network")  # settings
+    s = sub.add_parser("settingsset", help="one Settings change ({op, ...} as base64 JSON); --stdin: a key's value on stdin")  # settings
+    s.add_argument("--req64", required=True)
+    s.add_argument("--stdin", action="store_true")
     a = ap.parse_args(argv)
     if getattr(a, "id_opt", None):
         a.id = a.id_opt
 
     if a.cmd == "exec":
         return execute(a.id)
+    if a.cmd in ("settings", "settingsset"):                          # settings
+        import settings
+        out = settings.main(a, sys.stdin)
+        print(json.dumps(out, ensure_ascii=False))
+        return 0 if out.get("ok", True) else 2
     if a.cmd in ("chatstart", "chatget", "chatrun"):                 # chat
         import chat
-        return chat.main(a, lambda rid: (lambda r: summary(r) if r else None)(find(rid)))
+        return chat.main(a, lambda rid: (lambda r: summary(r) if r else None)(find(rid)), run_env())
     if a.cmd == "entitytrace":                                      # entitytrace
         out = entitytrace_command(a)
         print(json.dumps(out, ensure_ascii=False))
         return 0 if out.get("ok", True) else 2
-    if a.cmd in ("sourcelist", "sourceadd", "sourceupdate", "sourceremove", "sourcehide", "sourceunhide", "sourcethumb", "wikipedia", "notice", "pagetext", "collections", "draft"):
+    if a.cmd in ("sourcelist", "sourceadd", "sourceupdate", "sourceremove", "sourcehide", "sourceunhide", "sourcethumb", "wikipedia", "notice", "pagetext", "collections", "collectiongroup", "collectiongroupedit", "draft"):
         out = other_command(a)
         print(json.dumps(out, ensure_ascii=False))
         return 0 if out.get("ok", True) else 2
@@ -1997,7 +2224,7 @@ def main(argv=None) -> int:
         out = logdb(a)
         print(json.dumps(out, ensure_ascii=False))
         return 0 if out.get("ok") else 2
-    if a.cmd in ("cataloguestart", "catalogueget", "catalogueact", "catalogueedit", "cataloguemark", "catalogueexport", "cataloguerun", "history", "briefgen"):
+    if a.cmd in ("cataloguestart", "catalogueget", "catalogueact", "catalogueedit", "catalogueadd", "cataloguemark", "catalogueexport", "cataloguerun", "history", "briefgen"):
         import catalogue
         try:
             if a.cmd == "briefgen":
@@ -2011,7 +2238,7 @@ def main(argv=None) -> int:
                 out = history.rows(a.kind, a.limit)
             else:
                 out = (catalogue.begin(a.source, a.model, json.loads(a.args) if a.args else None) if a.cmd == "cataloguestart" else catalogue.get(a.source) if a.cmd == "catalogueget"
-                       else catalogue.act(a.source, a.action) if a.cmd == "catalogueact" else catalogue.edit(a.source, a.index, a.value, pending=a.pending) if a.cmd == "catalogueedit" else catalogue.mark(a.source, a.index, bool(a.rejected)) if a.cmd == "cataloguemark" else catalogue.export(a.source, a.format))
+                       else catalogue.act(a.source, a.action) if a.cmd == "catalogueact" else catalogue.edit(a.source, a.index, a.value, pending=a.pending) if a.cmd == "catalogueedit" else catalogue.add(a.source, a.key, a.kind, a.value, pending=a.pending) if a.cmd == "catalogueadd" else catalogue.mark(a.source, a.index, bool(a.rejected)) if a.cmd == "cataloguemark" else catalogue.export(a.source, a.format))
         except ValueError as e:
             out = {"ok": False, "why": str(e)}
         print(json.dumps(out, ensure_ascii=False))
@@ -2104,7 +2331,8 @@ def main(argv=None) -> int:
         try:
             rec = start(a.path, a.name, a.model, a.dry, a.fast, a.pages, a.budget, a.archive, a.recipe, a.source, a.rate,
                        a.workflow, a.models, a.without, a.flow, a.lag, a.after, None, not a.no_limits,
-                       agents=parse_agents(a.agents))
+                       agents=parse_agents(a.agents),
+                       answer=True if a.answer else False if a.no_answer else None)
         except ValueError as e:
             print(json.dumps({"ok": False, "why": str(e)}) if a.json else f"cannot start: {e}")
             return 2
@@ -2185,6 +2413,12 @@ def main(argv=None) -> int:
         print(json.dumps(out, ensure_ascii=False))
         return 0 if out.get("ok") else 2
     # end pageview
+    # answering
+    if a.cmd == "answer":
+        out = {"id": rec["id"], **answering.answer(rec.get("archive") or _files(rec).archive(), a.question, a.choice)}
+        print(json.dumps(out, ensure_ascii=False))
+        return 0 if out.get("ok") else 2
+    # end answering
     # export
     if a.cmd == "export":
         try:
@@ -2384,6 +2618,21 @@ def other_command(a) -> dict:
             return {"ok": True, **(archives.reset_draft() if a.reset else archives.ensure_draft())}
         import tools                                                 # collections
         arch = tools.allowed_archive(a.archive)
+        if a.cmd == "collectiongroup":
+            import contextlib
+            with contextlib.redirect_stdout(sys.stderr):             # the rebuild's words never mix into the one JSON answer
+                got = archives.make_group(str(arch), a.collections.split(","), a.title)
+            log_action("complex", f"group-{got['name']}", {"detail": {"action": "group", "archive": str(arch), **got}})
+            return got
+        if a.cmd == "collectiongroupedit":
+            import contextlib
+            with contextlib.redirect_stdout(sys.stderr):
+                got = archives.edit_group(str(arch), a.key, a.title, a.collections.split(",") if a.collections else None)
+            what = "renamed" if a.title is not None else "changed" if a.collections else "removed"
+            log_action("complex", f"group-{got['name']}", {"status": what, "detail": {"action": what, "archive": str(arch), **got}})
+            return got
+        if getattr(a, "group", None):
+            return archives.group_records(str(arch), a.group, a.offset, a.limit)
         if a.collection:
             return archives.records(str(arch), a.collection, a.offset, a.limit)
         got = archives.collections(str(arch))

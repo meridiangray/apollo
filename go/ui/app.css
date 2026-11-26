@@ -231,8 +231,12 @@ ol.rl{list-style:none;margin:0;padding:0}
 .rl li>.dot{margin-top:.35rem}
 .rl small{grid-column:2;color:var(--muted);font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rl time{color:var(--muted);font-size:.76rem;font-variant-numeric:tabular-nums}
-.rl .mini{grid-column:2/4;display:flex;gap:1px;height:7px;margin-top:.15rem}
-.rl .mini i{flex:1 1 0;max-width:7px;min-width:1px;border-radius:1px}
+.rl .mini{grid-column:2/4;display:flex;gap:1px;align-items:center;height:7px;margin-top:.15rem}
+.rl .mini.has-mi{height:10px}
+.rl .mini i{flex:1 1 0;max-width:7px;min-width:1px;height:7px;border-radius:1px}
+.rl .mini .mi{flex:none;width:10px;height:10px;margin-right:4px;color:var(--muted)}
+.rl .mini .mi .ic{display:block;line-height:0}
+.rl .mini .mi .ic svg{width:10px;height:10px;display:block}
 .rl .chip{margin-left:.3rem}
 /* a source's lights: one icon a flow, quiet until that flow has run, then the colour of its newest run's state */
 .rl .lights{grid-column:2/4;display:flex;gap:.3rem;margin-top:.2rem}
@@ -554,13 +558,19 @@ dialog.reg{position:absolute;inset:0;margin:auto;height:max-content;width:30rem;
 .lg b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .stg{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem .35rem}
 .stg .sep{align-self:stretch;width:1px;margin:0 .5rem;background:var(--line)}
-.sb{display:flex;flex-direction:column;align-items:center;gap:.3rem;width:4.9rem;flex:none;padding:.2rem .3rem;border:0;background:none;cursor:pointer;color:var(--ink)}
-.sb .bi{display:grid;place-items:center;width:2.7rem;height:2.7rem;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--link);font-size:1.25rem}
-.sb .bl{font-size:.76rem;white-space:nowrap}
+/* Configure flows: one plain grid of icon-over-name tiles */
+.sgs{display:grid;grid-template-columns:repeat(auto-fill,4.3rem);gap:.35rem .25rem;flex:1 1 24rem;min-width:0;align-items:start}   /* fixed tiles: they never re-space when the Run area changes */
+.sb{display:flex;flex-direction:column;align-items:center;gap:.25rem;min-width:0;padding:.2rem .1rem;border:0;background:none;cursor:pointer;color:var(--ink)}
+.sb .bi{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--link)}
+.sb .bi .ic{width:1.3rem;height:1.3rem;margin:0}
+.sb .bi .ic svg{width:1.3rem;height:1.3rem}
+.sb .bl{font-size:.76rem;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .sb:hover .bi{border-color:var(--accent)}
 .sb[aria-pressed=true] .bi{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link);background:var(--chip-d)}
 .sb[aria-pressed=true] .bl{color:var(--link)}
-.sb.off .bi{color:var(--muted)}.sb.off .bl{color:var(--muted)}
+.sb.off .bi,.sb.off .bl,.sb:disabled .bi,.sb:disabled .bl{color:var(--muted)}
+.sb:disabled{cursor:default;opacity:.55}
+.sb:disabled:hover .bi{border-color:var(--line)}
 .sb:focus-visible .bi,.q:focus-visible,.seg button:focus-visible,.sw2:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 .sp{display:flex;flex-direction:column;gap:.8rem;padding:.9rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -591,7 +601,7 @@ dialog.reg{position:absolute;inset:0;margin:auto;height:max-content;width:30rem;
 /* Configure: Run sits at the right end of the stage buttons' row, beside the choices it runs */
 .stgrow{display:flex;align-items:center;gap:1rem}
 .stgrow .stg{flex:1;min-width:0}
-.stgrow .go{margin:0;padding:0;border-top:0;flex:none}
+.stgrow .go{margin:0;padding:0;border-top:0;flex:none;min-width:13.2rem}   /* room for Dry, Limits and Run whichever flow is picked */
 .f .allp,.allp{display:inline-flex;align-items:center;gap:.35rem;margin-left:.8rem;font:400 .86rem var(--sans);text-transform:none;letter-spacing:normal;color:var(--ink);white-space:nowrap;cursor:pointer}
 .allp input{accent-color:var(--link);margin:0;padding:0;width:auto;flex:none}
 .f .allp{gap:.35rem}
@@ -613,11 +623,7 @@ dialog.reg{position:absolute;inset:0;margin:auto;height:max-content;width:30rem;
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none;border-top-color:var(--line)}}
 
-/* settings panel */
-.pop{position:fixed;top:3.6rem;right:.75rem;z-index:30;width:19rem;padding:.9rem 1rem 1rem;background:var(--panel);
- border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow),0 8px 24px rgba(0,0,0,.12)}
-.pop h3{margin:0 0 .5rem;font:600 .78rem/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.pop section+section{margin-top:1rem}
+/* the theme swatches (Settings: Appearance) */
 .swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:.4rem}
 .swatch{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.35rem .1rem;background:none;
  border:1px solid transparent;border-radius:var(--radius);cursor:pointer;font-size:.74rem}
@@ -625,8 +631,6 @@ dialog.reg{position:absolute;inset:0;margin:auto;height:max-content;width:30rem;
 .swatch[aria-pressed=true]{border-color:var(--link);color:var(--link)}
 .swatch i{display:block;width:2rem;height:1.4rem;border-radius:6px;border:1px solid rgba(128,128,128,.4);
  background:linear-gradient(135deg,var(--sw-bg) 55%,var(--sw-accent) 55% 78%,var(--sw-link) 78%)}
-.pop .seg button:disabled{opacity:.4;cursor:default}
-#cog[aria-expanded=true]{border-color:var(--link);color:var(--link)}
 .swatch:focus-visible,#cog:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 
 /* Configure: the Flow card, top right like a wiki infobox: the selected button's agents in order */
@@ -724,7 +728,6 @@ pre.raw{margin:.4rem 0 0;max-height:16rem;overflow:auto;white-space:pre-wrap;wor
 :root{--ic:.95rem}
 .ic{display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:-.2em}
 .ic svg,.ei svg{width:var(--ic);height:var(--ic);stroke-width:2}
-.sb .bi .ic svg{width:1.3rem;height:1.3rem}
 .lr .ic .ei svg{width:var(--ic);height:var(--ic)}
 
 /* the Flow card: a plain ordered list, the status as the mark in a fixed column, the sentence at full width */
@@ -748,16 +751,10 @@ pre.raw{margin:.4rem 0 0;max-height:16rem;overflow:auto;white-space:pre-wrap;wor
 /* Configure: the stage row is two labelled groups, Flow and Tools, and Run at the right */
 .stgrow{align-items:flex-end;flex-wrap:wrap;gap:1rem 1.6rem}
 .stgrow.first{margin:.2rem 0 1.5rem;padding-bottom:1.2rem;border-bottom:1px solid var(--line)}
-.sgs{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:stretch;gap:1.1rem 0}
-.sgp{display:flex;flex-direction:column;gap:.55rem;min-width:0}
-.sgp+.sgp{margin-left:1.4rem;padding-left:1.4rem;border-left:1px solid var(--line)}
-.sgp .gl{font:600 .7rem var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-left:.3rem}
-.sgp .gb{display:flex;flex-wrap:wrap;gap:.5rem .35rem}
 .grades{display:inline-flex;align-items:center;gap:.9rem}
 .gr1{display:inline-flex;align-items:center;gap:.35rem}
 .gr1 input.n{width:3.4rem}
 .stgrow .go{margin-left:auto}
-@media (max-width:62rem){.sgp+.sgp{margin-left:0;padding-left:0;border-left:0}}
 
 /* the tools' results: pages of text side by side in one list, and the findings */
 .tres{display:flex;flex-direction:column;gap:.8rem;max-height:30rem;overflow:auto}
@@ -868,8 +865,6 @@ pre.raw{margin:.4rem 0 0;max-height:16rem;overflow:auto;white-space:pre-wrap;wor
 .colp .spin{display:inline-block}
 
 /* cost is hidden unless the cog's Show cost is on: the runs list drops its Cost column */
-.pop .swrow{display:flex;align-items:center;justify-content:space-between}
-.pop .swrow h3{margin:0}
 .lim .f .pp2{padding:.3rem 0}
 
 /* Text: Proofread beside the page controls, its diff, and the Data tab */
@@ -1178,6 +1173,9 @@ ol.etr{margin:0;padding:0;list-style:none}
 .portrait td.inl[data-f=url]{display:table-cell;overflow-wrap:anywhere}
 .ined{display:block;width:100%;box-sizing:border-box;resize:none;overflow:hidden;font:inherit;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap;color:var(--ink);background:var(--input);border:1px solid var(--accent);border-radius:6px;padding:.15rem .35rem}
 .ined:focus{outline:none}
+.catform{display:flex;gap:.4rem;align-items:center}
+.catform select.ined{width:auto;flex:none}
+.catform input.ined{flex:1;min-width:0}
 .chk{display:flex;flex-direction:column;gap:.6rem;padding-top:.2rem}
 .chk .cl{font:600 .72rem var(--sans);color:var(--muted);margin-bottom:.15rem}
 .chk .cv{display:flex;gap:.5rem;font-size:.84rem;overflow-wrap:anywhere}
@@ -1209,7 +1207,6 @@ ol.etr{margin:0;padding:0;list-style:none}
 .btn .ic svg,.rp .ic svg{display:block;width:16px;height:16px;stroke-width:2}
 .btn.run .ic svg{stroke-width:2.25}
 .ib svg,.ib .ic svg,.srcfilter .ib .ic svg,.wikib .ic svg,.pgnav .prb .ic svg{display:block;width:18px;height:18px;stroke-width:2}
-.sb .bi .ic{width:1.3rem;height:1.3rem;margin:0}
 .bt{text-box:trim-both cap alphabetic}
 
 /* sources polish: the filter row heads the main column; Catalogue is a split button at its right edge; the drop bay follows the list */
@@ -1426,3 +1423,166 @@ button.pv-c2[aria-pressed=true]{border-color:var(--link);background:var(--chip-d
 .srkv .infobox2 th{width:10rem;font-weight:500}
 .srpic{margin:0}.srpic img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .srhead h2.inl{cursor:text}
+
+/* CZ306: Complex Collection */
+.xrail .colbar{gap:.5rem}.xrail .colbar select{min-width:0;flex:1}
+.crl li.cgrp.cplx{cursor:pointer}
+.crl li.cgrp.cplx:hover:not(.sel){background:var(--soft)}
+.crl li.cplx time{grid-column:3}
+.crl li.cplx small.cspan{grid-column:2/4;white-space:normal;display:flex;flex-wrap:wrap;gap:.1rem .8rem}
+.crl li.cplx .cspan>span{display:inline-flex;align-items:center;gap:.3rem;min-width:0;max-width:100%}
+.crl li.cplx .cspan>span>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crl li.cplx .cspan .ic{font-size:12px;color:var(--link)}
+/* CZ312: Complex Collection, rename and ungroup in the card */
+.cgcap{display:flex;align-items:center;gap:.5rem;justify-content:space-between}
+.cgcap .cgt,.cgcap .cgin{flex:1;min-width:0;text-align:left;font:inherit}
+.cgcap .cgt{cursor:text;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cgcap .cgin{padding:.2rem .4rem;border:1px solid var(--link);border-radius:var(--radius);background:var(--panel);color:var(--ink)}
+.cgcap .cgbtn{display:inline-flex;gap:.3rem;flex:none}
+#colpanel .colents{margin-top:0;padding-top:0;border-top:0}
+#colpanel .xmain .srcart{margin-top:.3rem}
+.crl li.dt,#colpanel .xrail .scroll.dt{outline:2px solid var(--accent);outline-offset:-2px}
+.crl li[draggable=true]{cursor:grab}
+
+/* CZ320: Questions */
+.tabbody>.ql{overflow:visible;padding:0 .2rem 1rem 0}
+.qc{cursor:default;border-left-color:var(--line)}
+.qc.sel{border-color:var(--accent);border-left-color:var(--accent)}
+.qc .qh span:not(.grow){font-weight:400}
+.qc .qq{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qc q{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.qc .qs{margin-top:.25rem;font-size:.8rem;color:var(--muted)}
+.qc .qa .btn{display:inline-flex;align-items:center;gap:.4rem;text-align:left}
+.qc .qa.list{flex-direction:column;align-items:stretch}
+.qc .qa.list .x{margin-left:0;align-self:flex-start}
+.qc kbd{font:600 .66rem/1 var(--sans);min-width:1.1em;padding:.14rem .22rem;border-radius:4px;background:var(--chip);color:var(--muted);text-align:center}
+.qc .qa .x:hover{color:var(--ink)}
+.qc.done{padding:.5rem .8rem .55rem .7rem;border-left-color:var(--link)}
+.qc.done .qq{color:var(--muted);font-size:.84rem}
+.qc.done .qi{color:var(--link)}
+.qc .qd{display:flex;flex-wrap:wrap;align-items:baseline;gap:.1rem .7rem;margin-top:.2rem;font-size:.84rem}
+.qc .qd b{font-weight:600;color:var(--ink)}
+.qc .qd span{color:var(--muted);font-size:.78rem}
+.qc .undo{display:inline-grid;place-items:center;width:1.6rem;height:1.6rem;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);cursor:pointer}
+.qc .undo:hover{background:var(--chip);color:var(--ink)}
+.qc.sel{box-shadow:0 0 0 1px var(--accent)}
+.qc .qa.list .btn{justify-content:flex-start;border-radius:8px}
+.qc>:not(.qi){grid-column:2}
+.qc .qr{margin-top:.35rem}
+.qc q b{font-weight:700;font-style:italic;color:var(--ink)}
+.qc .qpg{display:block;margin:0 0 .1rem .75rem;font-size:.74rem;color:var(--muted)}
+
+/* CZ329: Collections */
+.crl li.cgrp{position:relative}
+.crl li.cgrp:has(>.cfold){padding-right:2rem}
+.crl .cfold{position:absolute;right:.35rem;top:.75rem;display:inline-grid;place-items:center;width:1.3rem;height:1.3rem;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);cursor:pointer}
+.crl .cfold:hover{color:var(--ink)}
+.crl .cfold .ic{--ic:14px}
+.crl .cfold svg{transition:transform .15s}
+.crl .cfold[aria-expanded=false] svg{transform:rotate(-90deg)}
+.crl li.cnew{cursor:default}
+.crl li.cnew .cgin{grid-column:2/4;min-width:0;padding:.2rem .4rem;font:inherit;border:1px solid var(--link);border-radius:var(--radius);background:var(--panel);color:var(--ink)}
+.crl li.cnew b{grid-column:2}.crl li.cnew time{grid-column:3}
+.crl li.cnew .dim{color:var(--muted);font-weight:400}
+.xrail .colbar .ib{flex:none}
+
+/* CZ322: Sources */
+/* the header: one row beside the title in the normal button size (pages, Brief, model, Catalogue, Remove); it wraps under the title only when it cannot fit */
+.srhead .dhead{flex-wrap:wrap;column-gap:1rem;row-gap:.3rem}
+.srhead .dhead h2{flex:1 1 18rem}
+.srhead .actions{flex:1 1 auto;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:.4rem;margin-left:auto}
+.srhead .dhead,.srhead .actions{min-width:0;max-width:100%}
+.srkv .catpend:first-child{margin-top:0;padding-top:0;border-top:0}
+.srhead .spages{box-sizing:border-box;width:5.6rem;height:var(--btn-h);padding:0 .75rem;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font:500 .86rem var(--sans);text-align:center}
+.srhead .spages:focus{outline:none;border-color:var(--link)}
+.srhead .ch-enum{height:var(--btn-h);padding:0 1.6rem 0 .75rem;gap:var(--btn-gap)}
+.srhead .ch-enum::after{right:.7rem}
+.srhead .csplit .btn.run:not(.busy){background:var(--panel);border-color:var(--line);color:var(--ink);font-weight:500}
+.srhead .csplit .btn.run:not(.busy):not(:disabled):hover{border-color:var(--link)}
+.srhead .csplit .catchev{margin-left:-1px}
+.srhead .csplit .catchev,.srhead .csplit .catchev:disabled{border-left-color:var(--line)}
+.srhead .csplit .btn.run .ic svg{stroke-width:2}
+@media (max-width:68rem){.srcard{grid-template-columns:minmax(0,1fr)}}
+/* Found: the kind chips head the list's column, so the Selected card beside them never moves */
+.stab .srcmain>.fchips{margin:0 0 .5rem}
+/* a waiting value's minus stays beside its box while the value is edited */
+.cline.editing:has(>.rjm){display:flex;align-items:flex-start}
+.cline.editing>.rjm{margin-top:.4rem}
+.cline.editing>.ined{flex:1;min-width:0}
+
+/* CZ318: Flows: New run's flow buttons as a table, one row per domain (its name, then its flows); a row's buttons wrap, so a
+   reduced window never scrolls sideways or clips one */
+
+/* CZ330: Settings */
+.wrap:not(.setmode) #setpanel{display:none}
+.wrap.setmode .runs,.wrap.setmode .detail{display:none}
+.wrap.setmode #setpanel{background:none;border:0;box-shadow:none;padding:0;overflow:hidden;display:grid;grid-template-columns:14rem minmax(0,1fr);gap:.75rem;min-height:0}
+#cog[aria-pressed=true]{border-color:var(--link);color:var(--link)}
+body.noline #scrollline{display:none!important}
+.setl li{grid-template-columns:minmax(0,1fr);cursor:pointer}
+.setl li b{grid-column:1}
+.sbody h3{margin:.4rem 0 .5rem;font:600 .74rem/1.2 var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.sbody h3:not(:first-child){margin-top:1.3rem}
+.stable{table-layout:auto}
+.stable td{padding:.3rem .4rem;border-bottom:1px solid var(--line);vertical-align:middle}
+.stable th{padding:.4rem .4rem}
+.stable .inp{width:100%;min-width:5rem;box-sizing:border-box;font:.86rem var(--sans);color:var(--ink);background:var(--input);border:1px solid var(--line);border-radius:8px;padding:.28rem .5rem}
+.stable .inp:disabled{color:var(--muted);background:var(--soft)}
+.stable .inp.wide{min-width:13rem}
+.stable .inp.n{width:4rem;min-width:0;font-variant-numeric:tabular-nums}
+.stable .inp:focus,.sgrid .inp:focus{outline:2px solid var(--link);outline-offset:-1px}
+.kcell{display:flex;align-items:center;gap:.45rem}
+.kcell .kname{min-width:11rem}
+.kset{flex:none;font-size:.74rem;color:var(--muted);white-space:nowrap}
+.kset.on{color:var(--link);font-weight:600}
+.kval{min-width:15rem}
+.sacts{white-space:nowrap}
+.sacts .sib+.sib{margin-left:.3rem}
+.ib.sib{width:1.75rem;height:1.75rem}
+.ib.sib .ic svg{width:14px;height:14px}
+.ib.sib:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+.sres{min-width:6rem;max-width:16rem;font-size:.8rem}
+.sres .tok{display:inline-flex;align-items:center;gap:.3rem;color:var(--link)}
+.sres .tok .ic svg{width:13px;height:13px}
+.sres .tbad{color:var(--red);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sadd{margin-top:.6rem}
+.sag th .mm{margin-right:.35rem}
+.sag td:first-child{font-weight:600}
+.sgrid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.7rem 1.4rem;align-items:center;margin:.5rem 0}
+.sgrid .sf{display:contents}
+.sgrid .sf>span:first-child{font-weight:600;font-size:.86rem}
+.sgrid .sf>.sw2{justify-self:start}
+.sgrid .pp2{display:flex;align-items:center;gap:.3rem;color:var(--muted)}
+.sgrid .inp{font:.86rem var(--sans);color:var(--ink);background:var(--input);border:1px solid var(--line);border-radius:8px;padding:.3rem .5rem}
+.sgrid .inp.n{width:6rem;font-variant-numeric:tabular-nums}
+.sgrid .inp.path{width:100%;max-width:44rem;font-family:var(--mono);font-size:.8rem}
+.sgrid .inp[readonly]{color:var(--muted);background:var(--soft)}
+.sbody .swatches.sws{max-width:26rem}
+.sws .swatch i{border-color:var(--line)}
+.sbody .seg button:disabled{opacity:.4;cursor:default}
+.sbody .seg button .mm{margin-right:.35rem}
+.setl li:focus-visible,.sib:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.cbody.sbody{gap:.55rem}
+.sbody h3{margin:.2rem 0 0}
+.sbody h3:not(:first-child){margin-top:1rem}
+.sbody>.seg,.sbody>.swatches{align-self:flex-start}
+.sbody>.sgrid{margin-top:.6rem}
+.stable.sag{width:auto;align-self:flex-start}
+.sag td,.sag th{padding-right:2.2rem}
+.sgrid .pp2 .u{display:inline-block;width:.7rem;text-align:right;font-style:normal}
+
+/* CZ335: Call notes */
+.rw .rv.cdo{flex:0 1 auto;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.cdid{margin:0 0 .45rem;font-weight:600}
+.cchips,.crefs{display:flex;flex-wrap:wrap;gap:.3rem;margin:0 0 .45rem}
+.cchip{padding:.05rem .5rem;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.76rem;font-variant-numeric:tabular-nums}
+.cchip b{color:var(--ink);font-weight:600;margin-left:.15rem}
+.clint{list-style:none;margin:0 0 .45rem;padding:0}
+.clint li{display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem .55rem;padding:.1rem 0}
+.crule{color:var(--red);font-size:.76rem;font-weight:600}
+.cnr{padding:0;border:0;background:none;color:var(--link);font:inherit;cursor:pointer;text-align:left}
+.cnr:hover{text-decoration:underline}
+.cnr:focus-visible{outline:2px solid var(--link);outline-offset:1px}
+.crefs .cnr{padding:.05rem .5rem;border:1px solid var(--line);border-radius:6px}
+.cmore{color:var(--muted);font-size:.76rem;align-self:center}
+.cgh{margin:.7rem 0 .2rem;padding:.15rem .35rem;color:var(--muted);font-size:.76rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid var(--line)}

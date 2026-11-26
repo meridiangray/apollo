@@ -238,21 +238,29 @@ def load_questions(archive) -> list[dict]:
     return [q for q in rows or [] if isinstance(q, dict) and q.get("id")]
 
 
-def workflow_changes(archive, window) -> list[dict]:
+def window_tasks(archive, window) -> set[str]:
+    """The ids of the archive's tasks created inside a run's window (a workflow run's own tasks)."""
+    mine = set()
+    if not archive or not window:
+        return mine
+    for f in (Path(archive) / ".hydra" / "tasks").glob("*.md"):
+        m = re.search(r"^- (\S+) created", _read_text(f), re.M)
+        if m and in_window(m.group(1), window):
+            mine.add(f.stem)
+    return mine
+
+
+def workflow_changes(archive, window, also=()) -> list[dict]:
     """What a workflow run changed, as the archive records it: [{kind, label, ids}]. Its tasks are the archive's tasks created
     inside the run's window; `.hydra/review/links.json` lists what each applied, and the questions asked in the window are its
     cards. Nothing recorded: []."""
     if not archive or not window:
         return []
     root = Path(archive) / ".hydra"
-    mine = set()
-    for f in (root / "tasks").glob("*.md"):
-        m = re.search(r"^- (\S+) created", _read_text(f), re.M)
-        if m and in_window(m.group(1), window):
-            mine.add(f.stem)
+    mine = window_tasks(archive, window)
     links = read_json(root / "review" / "links.json", {}) or {}
     applied = [str(x) for t in sorted(mine) for x in ((links.get(t) or {}).get("applied") or [])]
-    asked = [q["id"] for q in load_questions(archive) if in_window(q.get("asked"), window)]
+    asked = [q["id"] for q in load_questions(archive) if in_window(q.get("asked"), window) or q["id"] in also]
     out = []
     if applied:
         out.append({"kind": "applied", "label": f"{len(applied)} link{'s' if len(applied) != 1 else ''} applied", "ids": applied})
@@ -275,7 +283,8 @@ def archive_calls(archive) -> list[dict]:
         rows += Tail(f).all()
     rows.sort(key=lambda r: str(r.get("at") or ""))
     return [{"at": str(r.get("at") or "")[11:19] or str(r.get("at") or ""), "tool": r.get("tool"), "ms": r.get("ms"),
-             "ok": r.get("ok", True), "error": r.get("error"), "_stamp": r.get("at")} for r in rows]
+             "ok": r.get("ok", True), "error": r.get("error"), "_stamp": r.get("at"), "_args": r.get("args"),
+             "_step": r.get("step"), "_note": r.get("note") if isinstance(r.get("note"), dict) else None} for r in rows]
 
 
 # ---- one run -------------------------------------------------------------------------------------------------------
@@ -285,6 +294,7 @@ class RunFiles:
 
     def __init__(self, folder, kind: str = "pageflow", archive: str | None = None):
         self.folder, self.kind, self._archive = Path(folder), kind, archive
+        self.driven = kind in ("pageflow", "engine")          # a driver writes pageflow/ (an engine run: its progress too)
         self.pf = self.folder / "pageflow"
         self._trace, self._found = Tail(self.pf / "trace.jsonl"), Tail(self.pf / "found.jsonl")
         self._hydra, self._models = Tail(self.pf / "hydra.jsonl"), Tail(self.pf / "models.jsonl")
@@ -298,35 +308,44 @@ class RunFiles:
             self.session.feed(new)
 
     def progress(self) -> dict | None:
-        return read_json(self.pf / "progress.json") if self.kind == "pageflow" else None
+        return read_json(self.pf / "progress.json") if self.driven else None
 
     def state(self) -> dict:
+        if self.kind == "engine":                            # the engine keeps its state beside its stage: <run>/<flow>/
+            got = next((f for f in sorted(self.folder.glob("*/state.json")) if f.parent.name != "pageflow"), None)
+            return (read_json(got, {}) or {}) if got else {}
         return read_json(self.pf / "state.json", {}) or {}
 
     def archive(self) -> str | None:
         if self._archive:
             return self._archive
-        if self.kind == "pageflow":
+        if self.driven:
             return self.state().get("archive")
         self._feed()
         return self.session.archive
 
     def trace(self) -> list[dict]:
-        if self.kind == "pageflow":
+        if self.driven:
             return self._trace.all()
         self._feed()
         return self.session.rows
 
     def found(self) -> list[dict]:
-        return self._found.all() if self.kind == "pageflow" else []
+        return self._found.all() if self.driven else []
 
     def models(self) -> list[dict]:
         """models.jsonl: every model call (its answer too, for runs made since the raw log)."""
-        return self._models.all() if self.kind == "pageflow" else []
+        return self._models.all() if self.driven else []
 
     def hydra_rows(self) -> list[dict]:
         """hydra.jsonl as written: tool, args, ms, ok, text."""
-        return self._hydra.all() if self.kind == "pageflow" else []
+        return self._hydra.all() if self.driven else []
+
+    def mcp_rows(self) -> list[dict]:
+        """An agent session's calls as hydra wrote them to the archive (`.hydra/tasks/*.calls.jsonl`) inside the run's
+        window: tool, args, ms, ok, step and the call's `note` where it has one."""
+        a = self.archive()
+        return [c for c in (archive_calls(a) if a else []) if in_window(c.get("_stamp"), self.window)]
 
     def driver_log(self, lines: int = 300) -> list[str]:
         return tail_text(self.folder / "driver.log", lines)
@@ -335,7 +354,7 @@ class RunFiles:
         return self._transcript.all()
 
     def calls(self) -> list[dict]:
-        if self.kind == "pageflow":
+        if self.driven:
             return [{"at": r.get("at"), "tool": r.get("tool"), "ms": r.get("ms"), "ok": r.get("ok", True),
                      "error": None if r.get("ok", True) else r.get("text")} for r in self._hydra.all()]
         a = self.archive()
@@ -348,9 +367,35 @@ class RunFiles:
     def model_calls(self) -> int:
         return len(self._models.all())
 
+    def swept(self) -> set[str]:
+        """The questions the run's own links sweep says it asked (its transcript): a question another run had already asked
+        is the same question, so it keeps that run's time and falls outside this run's window."""
+        out: set[str] = set()
+        for ev in self._transcript.all():
+            body = (ev.get("message") or {}).get("content")
+            for b in body if isinstance(body, list) else []:
+                got = b.get("content") if isinstance(b, dict) and b.get("type") == "tool_result" else None
+                text = got if isinstance(got, str) else "".join(x.get("text", "") for x in got or [] if isinstance(x, dict))
+                if '"asked"' not in text:
+                    continue
+                try:
+                    asked = json.loads(text).get("asked")
+                except (ValueError, AttributeError):
+                    continue
+                if isinstance(asked, dict):
+                    out |= {v for v in asked.values() if isinstance(v, str) and v.startswith("ask-")}
+        return out
+
     def questions(self) -> list[dict]:
-        """The archive's questions; a run with a window: only those asked inside it (`asked`; one with no time is no run's)."""
-        return [q for q in load_questions(self.archive()) if in_window(q.get("asked"), self.window)]
+        """The archive's questions; a run with a window: those asked inside it (`asked`; one with no time is no run's) and
+        those its own sweep reports asking. Each carries its `passage` (answering.passages)."""
+        mine = self.swept() if self.window else set()
+        qs = [q for q in load_questions(self.archive()) if in_window(q.get("asked"), self.window) or q.get("id") in mine]
+        try:
+            import answering
+            return answering.attach(self.archive(), qs)
+        except Exception:                                    # noqa: BLE001 - the passage is a help, never a reason to lose a question
+            return qs
 
     def tasks(self) -> list[dict]:
         a = self.archive()
@@ -375,7 +420,7 @@ class RunFiles:
     def cost(self) -> dict:
         """{usd, haiku: [used, cap], sonnet: [used, cap], turns}: a page-flow run's from state.json, a session's from
         its transcript's result (None until it ends)."""
-        if self.kind == "pageflow":
+        if self.driven:
             m = self.state().get("models") or {}
             used, caps, tokens = m.get("used") or {}, m.get("caps") or m.get("budgets") or {}, m.get("tokens") or {}  # caps: the run's own, kept when limits are off
             usd = round(sum(float((v or {}).get("cost_usd") or 0) for v in tokens.values()), 4) if tokens else 0.0
@@ -596,22 +641,33 @@ def question_title(q: dict, labels: dict) -> str:
     return text if len(text) <= 80 else text[:79].rstrip() + "…"
 
 
-def question_rows(qs: list[dict], names: dict | None = None) -> dict:
-    """The Questions tab: {rows: [{id, title, status, kind, page, records, labels, question, quote, options, suggestion,
-    answer, asked}], open, answered, dismissed}, open ones first. `options` is a list; `labels` names each record id
-    (from `names`: {record id: name}); `title` is the human name of the card."""
+def question_rows(qs: list[dict], names: dict | None = None, extra: list[dict] | None = None) -> dict:
+    """The Questions tab: {rows: [{id, title, status, kind, page, records, labels, question, quote, options, choices,
+    suggestion, answer, asked, group}], open, answered, dismissed}, open ones first, then `extra` (the build's
+    own questions, answering.build_rows). `options` is a list; `choices` is what one click answers ({choice, label}: the
+    option's number for hydra's answer, the words on the button); `labels` names each record id (from `names`: {record
+    id: name}); `title` is the human name of the card; `answer` is {choice, text, by, at} once answered or dismissed."""
+    import answering
     names = names or {}
     rows = []
     for q in sorted(qs, key=lambda q: question_status(q) != "open"):
+        st = question_status(q)
         a = q.get("answer") if isinstance(q.get("answer"), dict) else ({"text": q["answer"]} if q.get("answer") else None)
+        if st == "dismissed":
+            d = q.get("dismissed") if isinstance(q.get("dismissed"), dict) else {}
+            a = {"choice": "Dismissed", "by": answering.you(d.get("by")), "at": d.get("at")}
         recs = [str(x) for x in q.get("records") or []]
         labels = {r: names[r] for r in recs if r in names}
-        rows.append({"id": q["id"], "title": question_title(q, labels), "status": question_status(q), "kind": q.get("kind"),
+        opts = _option_list(q.get("options"))
+        rows.append({"id": q["id"], "title": question_title(q, labels), "status": st, "kind": q.get("kind"),
                      "page": q.get("page"), "records": recs, "labels": labels, "question": str(q.get("question") or ""),
-                     "quote": str(q.get("quote") or ""), "options": _option_list(q.get("options")),
+                     "quote": str(q.get("quote") or ""), "options": opts,
+                     "choices": [{"choice": str(i), "label": o, **({"none": True} if answering.is_none(o) else {})} for i, o in enumerate(opts, 1)],
+                     "passage": q.get("passage"),
                      "suggestion": None if q.get("suggestion") is None else str(q["suggestion"]),
-                     "answer": None if not a else {"choice": a.get("choice"), "text": a.get("text")},
-                     "asked": q.get("asked")})
+                     "answer": None if not a else {"choice": a.get("choice"), "text": a.get("text"), "by": answering.you(a.get("by")), "at": a.get("at")},
+                     "asked": q.get("asked"), "group": "asked"})
+    rows += extra or []
     counts = {s: sum(r["status"] == s for r in rows) for s in ("open", "answered", "dismissed")}
     return {"rows": rows, **counts}
 
@@ -724,10 +780,16 @@ def page_groups(found: list[dict]) -> dict:
     return out
 
 
-def heat(progress: dict | None, state: dict, found: list[dict]) -> list[dict]:
+def heat(progress: dict | None, state: dict, found: list[dict], questions: list[dict] | None = None) -> list[dict]:
     """One row per page for the heatmap: page, status, records, quotes, places, groups ({category: records}), calls, seconds,
-    problems ({pass: count})."""
+    problems ({pass: count}); `asked`, the questions put to the person on the page (from `questions`), when there are any."""
     counts, places, groups = page_counts(found), page_places(found), page_groups(found)
+    asked: dict = {}
+    for q in questions or []:
+        try:
+            asked[int(q.get("page"))] = asked.get(int(q.get("page")), 0) + 1
+        except (TypeError, ValueError):
+            continue
     sp = state.get("pages") or {}
     out = []
     for page, status, _ in cells(progress, found):
@@ -738,6 +800,7 @@ def heat(progress: dict | None, state: dict, found: list[dict]) -> list[dict]:
                     "groups": groups.get(page, {}),
                     "calls": s.get("calls") or 0,
                     "seconds": round(float(s.get("seconds") or 0), 1), "problems": problems,
+                    **({"asked": asked[page]} if asked.get(page) else {}),
                     **({"reason": "gave up: " + str(s["gave_up"])} if s.get("gave_up") else {})})
     return out
 

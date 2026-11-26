@@ -136,3 +136,23 @@ def test_rows_with_no_linked_records_take_their_subjects_type():
     got = {(r["verb"], r["descriptor"]): r["schema"] for r in rows}
     assert got == {("Cited", "Quote"): "PublicBody", ("Placed", "OSM"): "Place", ("Asked", "Identity"): "Person",
                    ("Escalated", "Page"): "Person", ("Asked", "Page"): None, ("Added", "Collection"): "Place", ("Ran", "Triage"): None}
+
+
+def test_raw_view_of_a_session_carries_the_call_notes(tmp_path):
+    a = tmp_path / "arch"
+    (a / "collections").mkdir(parents=True)
+    (a / ".hydra" / "tasks").mkdir(parents=True)
+    (a / "collections" / "c1.json").write_text(json.dumps({"records": [
+        {"id": "emp-1", "schema": "Employment", "properties": {"name": ["Ann at Acme"]}}]}), encoding="utf-8")
+    note = {"did": "Saved 1 record in c1", "counts": {"records": 1}, "refs": ["emp-1", "emp-2"], "refs_more": 3, "step": "S2 Save",
+            "lint": [{"rule": "date-order", "id": "emp-1", "say": "starts after it ends."}]}
+    rows = [{"n": 1, "at": "2026-11-26T10:00:00Z", "tool": "save", "args": {"c": 1}, "ok": True, "ms": 5, "step": "S2 Save", "note": note},
+            {"n": 2, "at": "2026-11-26T10:00:01Z", "tool": "tasks", "args": {}, "ok": True, "ms": 1, "step": None}]
+    (a / ".hydra" / "tasks" / "t.calls.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    files = runfiles.RunFiles(tmp_path / "run", "mcp-session", str(a))
+    raw = runview.raw_view(files, "mcp-session")
+    first, second = raw["hydra"]
+    assert raw["archive"] == str(a) and first["step"] == "S2 Save" and first["note"]["did"] == "Saved 1 record in c1"
+    assert first["note"]["recs"] == {"emp-1": {"name": "Ann at Acme", "col": "c1", "schema": "Employment"}}
+    assert first["note"]["lint"][0]["say"] == "starts after it ends." and first["note"]["refs_more"] == 3
+    assert second["tool"] == "tasks" and "note" not in second and second["step"] is None

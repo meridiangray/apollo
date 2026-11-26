@@ -18,11 +18,13 @@ import (
 type Backend struct {
 	GOOS    string
 	Python  string
-	Manager   string
+	Manager string
 	Distro  string
 	Timeout time.Duration
 	// Exec runs argv and returns stdout, stderr and the exit code (a test replaces it).
 	Exec func(ctx context.Context, argv []string) (stdout, stderr []byte, code int, err error)
+	// ExecIn is Exec with standard input (CallIn); nil runs the process (a test replaces it).
+	ExecIn func(ctx context.Context, argv []string, stdin []byte) (stdout, stderr []byte, code int, err error)
 	// Worker, when set, answers the quick read-only calls from one long-lived manager (worker.go).
 	Worker *worker
 }
@@ -81,12 +83,49 @@ func (b *Backend) Call(ctx context.Context, timeout time.Duration, args ...strin
 	var err error
 	if b.Worker != nil && len(args) > 0 && workerCalls[args[0]] {
 		out, code, err = b.Worker.call(ctx, args)
-		if err != nil && ctx.Err() == nil {           // the worker could not answer: one process, as before
+		if err != nil && ctx.Err() == nil { // the worker could not answer: one process, as before
 			out, errb, code, err = b.Exec(ctx, argv)
 		}
 	} else {
 		out, errb, code, err = b.Exec(ctx, argv)
 	}
+	return finish(ctx, timeout, what, out, errb, code, err)
+}
+
+// CallIn is Call with `stdin` given to the manager, always in a process of its own (never the worker, whose stdin is
+// its request pipe): a key's value travels this way, never on a command line.
+func (b *Backend) CallIn(ctx context.Context, timeout time.Duration, stdin []byte, args ...string) (json.RawMessage, error) {
+	if timeout < b.Timeout {
+		timeout = b.Timeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	run := b.ExecIn
+	if run == nil {
+		run = runProcessIn
+	}
+	out, errb, code, err := run(ctx, b.Command(args...), stdin)
+	return finish(ctx, timeout, "apollo.py "+strings.Join(args[:min(len(args), 1)], " "), out, errb, code, err)
+}
+
+func runProcessIn(ctx context.Context, argv []string, stdin []byte) ([]byte, []byte, int, error) {
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	hideWindow(cmd)
+	cmd.WaitDelay = 3 * time.Second
+	cmd.Stdin = bytes.NewReader(stdin)
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	err := cmd.Run()
+	code := 0
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		code, err = ee.ExitCode(), nil
+	}
+	return out.Bytes(), errb.Bytes(), code, err
+}
+
+// finish reads a manager call's output: its JSON, or a ManagerError saying why there is none.
+func finish(ctx context.Context, timeout time.Duration, what string, out, errb []byte, code int, err error) (json.RawMessage, error) {
 	if ctx.Err() == context.DeadlineExceeded {
 		return nil, &ManagerError{fmt.Sprintf("%s: no answer in %s", what, timeout)}
 	}
@@ -144,12 +183,12 @@ func lastLines(s string, n int) string {
 // ---- the manager's JSON ---------------------------------------------------------------------------------------
 
 type Progress struct {
-	Fraction *float64       `json:"fraction"`
-	Stage    *string        `json:"stage"`
-	Label    *string        `json:"label"`
-	Done     *int           `json:"done"`
-	Total    *int           `json:"total"`
-	Pages    map[string]int `json:"pages"`
+	Fraction     *float64       `json:"fraction"`
+	Stage        *string        `json:"stage"`
+	Label        *string        `json:"label"`
+	Done         *int           `json:"done"`
+	Total        *int           `json:"total"`
+	Pages        map[string]int `json:"pages"`
 	Chunk        *Chunk         `json:"chunk"`
 	PagesRead    int            `json:"pages_read"`
 	PagesContent int            `json:"pages_content"`
@@ -171,42 +210,42 @@ type Cost struct {
 
 // Summary is one `ls --json` row. The *_host fields are added here: the folders as this OS shows them.
 type Summary struct {
-	Schema        int      `json:"schema"`
-	ID            string   `json:"id"`
-	Name          *string  `json:"name"`
-	Kind          string   `json:"kind"`
-	Model         *string  `json:"model"`
-	Status        string   `json:"status"`
-	Detail        *string  `json:"detail"`
-	Alive         bool     `json:"alive"`
-	PID           *int     `json:"pid"`
-	Dry           bool     `json:"dry"`
-	Fast          bool     `json:"fast"`
-	Started       *string  `json:"started"`
-	Ended         *string  `json:"ended"`
-	ElapsedS      *float64 `json:"elapsed_s"`
-	ExitCode      *int     `json:"exit_code"`
-	RunFolder     string   `json:"run_folder"`
-	Archive       *string  `json:"archive"`
-	Config        *string  `json:"config"`
-	Recipe        *string  `json:"recipe"`
-	Source        *string  `json:"source"`
-	Flow          *string  `json:"flow"`     // the flow's one-word name
-	FlowKey       *string  `json:"flow_key"` // read, links, places, stubs or enrich
-	Agents        map[string]*int `json:"agents"` // agents per grade: haiku, sonnet, opus
-	SourceTitle   *string  `json:"source_title"`
-	ArchiveName   *string  `json:"archive_name"`
-	Progress      Progress `json:"progress"`
-	Cells         []Cell   `json:"cells"`
-	Calls         Calls    `json:"calls"`
-	Cost          Cost     `json:"cost"`
-	Last          string   `json:"last"`
-	Limits        *bool    `json:"limits"` // limits
-	Resumable     bool     `json:"resumable"`
-	Now           string   `json:"now"`
-	Report       *string  `json:"report"`
-	RunFolderHost string   `json:"run_folder_host"`
-	ArchiveHost   string   `json:"archive_host,omitempty"`
+	Schema        int             `json:"schema"`
+	ID            string          `json:"id"`
+	Name          *string         `json:"name"`
+	Kind          string          `json:"kind"`
+	Model         *string         `json:"model"`
+	Status        string          `json:"status"`
+	Detail        *string         `json:"detail"`
+	Alive         bool            `json:"alive"`
+	PID           *int            `json:"pid"`
+	Dry           bool            `json:"dry"`
+	Fast          bool            `json:"fast"`
+	Started       *string         `json:"started"`
+	Ended         *string         `json:"ended"`
+	ElapsedS      *float64        `json:"elapsed_s"`
+	ExitCode      *int            `json:"exit_code"`
+	RunFolder     string          `json:"run_folder"`
+	Archive       *string         `json:"archive"`
+	Config        *string         `json:"config"`
+	Recipe        *string         `json:"recipe"`
+	Source        *string         `json:"source"`
+	Flow          *string         `json:"flow"`     // the flow's one-word name
+	FlowKey       *string         `json:"flow_key"` // read, links, places, stubs or enrich
+	Agents        map[string]*int `json:"agents"`   // agents per grade: haiku, sonnet, opus
+	SourceTitle   *string         `json:"source_title"`
+	ArchiveName   *string         `json:"archive_name"`
+	Progress      Progress        `json:"progress"`
+	Cells         []Cell          `json:"cells"`
+	Calls         Calls           `json:"calls"`
+	Cost          Cost            `json:"cost"`
+	Last          string          `json:"last"`
+	Limits        *bool           `json:"limits"` // limits
+	Resumable     bool            `json:"resumable"`
+	Now           string          `json:"now"`
+	Report        *string         `json:"report"`
+	RunFolderHost string          `json:"run_folder_host"`
+	ArchiveHost   string          `json:"archive_host,omitempty"`
 }
 
 type Task struct {
@@ -291,6 +330,8 @@ type HeatRow struct {
 	Calls    int            `json:"calls"`
 	Seconds  float64        `json:"seconds"`
 	Problems map[string]int `json:"problems"`
+	Asked    int            `json:"asked,omitempty"`   // answering: the questions put to the person on this page
+	Changed  int            `json:"changed,omitempty"` // a workflow run: the records it added, changed or removed on this page
 	Reason   string         `json:"reason,omitempty"`
 }
 
@@ -385,22 +426,26 @@ type FoundGroup struct {
 type Answer struct {
 	Choice any `json:"choice"`
 	Text   any `json:"text"`
+	By     any `json:"by"`
+	At     any `json:"at"`
 }
 
 type Question struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	Status     string   `json:"status"`
-	Kind       *string  `json:"kind"`
-	Page       any      `json:"page"`
-	Records    []string `json:"records"`
+	ID         string            `json:"id"`
+	Title      string            `json:"title"`
+	Status     string            `json:"status"`
+	Kind       *string           `json:"kind"`
+	Page       any               `json:"page"`
+	Records    []string          `json:"records"`
 	Labels     map[string]string `json:"labels"`
-	Asked      *string  `json:"asked"`
-	Question   string   `json:"question"`
-	Quote      string   `json:"quote"`
-	Options    []string `json:"options"`
-	Suggestion *string  `json:"suggestion"`
-	Answer     *Answer  `json:"answer"`
+	Asked      *string           `json:"asked"`
+	Question   string            `json:"question"`
+	Quote      string            `json:"quote"`
+	Options    []string          `json:"options"`
+	Suggestion *string           `json:"suggestion"`
+	Answer     *Answer           `json:"answer"`
+	Choices    json.RawMessage   `json:"choices,omitempty"` // answering: the buttons, {choice, label}
+	Group      string            `json:"group,omitempty"`   // asked (an agent) or build
 }
 
 type CallRow struct {
@@ -491,16 +536,16 @@ type RecipeEntry struct {
 }
 
 type SourceEntry struct {
-	Name      string  `json:"name"`
-	Path      string  `json:"path"`
-	PathHost  string  `json:"path_host"`
-	Title     string  `json:"title"`
-	Publisher *string `json:"publisher"`
-	File      *string `json:"file"`
-	Pages     *string `json:"pages"`
-	Reference bool    `json:"reference"`
-	Dropped   bool    `json:"dropped"`
-	Context   *string `json:"context"`
+	Name      string   `json:"name"`
+	Path      string   `json:"path"`
+	PathHost  string   `json:"path_host"`
+	Title     string   `json:"title"`
+	Publisher *string  `json:"publisher"`
+	File      *string  `json:"file"`
+	Pages     *string  `json:"pages"`
+	Reference bool     `json:"reference"`
+	Dropped   bool     `json:"dropped"`
+	Context   *string  `json:"context"`
 	Needs     []string `json:"needs"`
 }
 
@@ -522,6 +567,7 @@ type FlowEntry struct {
 	Label  string               `json:"label"`
 	Domain string               `json:"domain"`
 	Needs  string               `json:"needs"`
+	After  string               `json:"after,omitempty"`
 	Grades map[string]GradeSpec `json:"grades"`
 }
 
@@ -536,6 +582,7 @@ type DraftEntry struct {
 	PathHost string `json:"path_host"`
 	Exists   bool   `json:"exists"`
 	Name     string `json:"name"`
+	Records  int    `json:"records"`
 }
 
 type ConfigEntry struct {
@@ -686,35 +733,40 @@ func ParseOutcome(raw []byte) (*Outcome, error) {
 // ---- what a start may carry ------------------------------------------------------------------------------------
 
 type StartRequest struct {
-	Config string `json:"config"`
-	Recipe string `json:"recipe"`
-	Source string `json:"source"`
-	Name   string `json:"name"`
-	Model  string `json:"model"`
-	Dry    bool   `json:"dry"`
-	Pages  string `json:"pages"`
-	Budget string `json:"budget"`
-	Workflow string `json:"workflow"`
-	Archive  string `json:"archive"`
-	Models   string `json:"models"`
-	Without  string `json:"without"`
-	Flow     string `json:"flow"`
-	Lag      bool   `json:"lag"`
-	After    string `json:"after"`
-	NoLimits bool   `json:"no_limits"` // limits
-	Agents   map[string]int `json:"agents"` // agents per model grade; a missing grade takes the flow's default
+	Config   string         `json:"config"`
+	Recipe   string         `json:"recipe"`
+	Source   string         `json:"source"`
+	Name     string         `json:"name"`
+	Model    string         `json:"model"`
+	Dry      bool           `json:"dry"`
+	Pages    string         `json:"pages"`
+	Budget   string         `json:"budget"`
+	Workflow string         `json:"workflow"`
+	Archive  string         `json:"archive"`
+	Models   string         `json:"models"`
+	Without  string         `json:"without"`
+	Flow     string         `json:"flow"`
+	Lag      bool           `json:"lag"`
+	After    string         `json:"after"`
+	Answer   bool           `json:"answer"`    // wikidata or assemble: the session answers its own questions
+	NoAnswer bool           `json:"no_answer"` // assemble: Answer questions off (it is on unless this is set)
+	NoLimits bool           `json:"no_limits"` // limits
+	Agents   map[string]int `json:"agents"`    // agents per model grade; a missing grade takes the flow's default
 }
 
 var (
-	reModel  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$`)
-	rePages  = regexp.MustCompile(`^\d{1,5}(-\d{1,5})?$`)
-	reBudget = regexp.MustCompile(`^(\d{1,7}(\.\d{1,2})?|none)$`)
-	reModels = regexp.MustCompile(`^[a-z]+=[A-Za-z0-9._:/-]+(,[a-z]+=[A-Za-z0-9._:/-]+)*$`)
+	reModel   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$`)
+	rePages   = regexp.MustCompile(`^\d{1,5}(-\d{1,5})?$`)
+	reBudget  = regexp.MustCompile(`^(\d{1,7}(\.\d{1,2})?|none)$`)
+	reModels  = regexp.MustCompile(`^[a-z]+=[A-Za-z0-9._:/-]+(,[a-z]+=[A-Za-z0-9._:/-]+)*$`)
 	reWithout = regexp.MustCompile(`^(lag|rate|supervise|escalate)(,(lag|rate|supervise|escalate))*$`)
-	reLang   =regexp.MustCompile(`^(auto|[a-z]{2,3})$`)
-	reSlug   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,59}$`)
-	reID     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$`)
+	reLang    = regexp.MustCompile(`^(auto|[a-z]{2,3})$`)
+	reSlug    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,59}$`)
+	reID      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$`)
 )
+
+// engineFlow: the flows pageflow/engine.py drives (apollo.py ENGINE_FLOWS); each takes the source its Basic run read.
+var engineFlow = map[string]bool{"assemble": true, "refine": true, "timeline": true, "finance": true, "wikidata": true, "wiki": true, "places": true}
 
 // StartArgs checks a start and builds the manager's arguments. Every value is one argument of its own; none can
 // start with `-`, so none is read as an option.
@@ -739,8 +791,8 @@ func StartArgs(goos string, r StartRequest) ([]string, error) {
 				args = append(args, "--lag")
 			}
 			if r.After != "" {
-				if r.After != "links" {
-					return nil, errors.New("after: links")
+				if r.After != "assemble" {
+					return nil, errors.New("after: assemble")
 				}
 				args = append(args, "--after", r.After)
 			}
@@ -749,6 +801,29 @@ func StartArgs(goos string, r StartRequest) ([]string, error) {
 				return nil, errors.New("pick an archive")
 			}
 			args = []string{"start", "--flow", r.Flow, "--json"}
+			if r.Answer && r.NoAnswer {
+				return nil, errors.New("answer: on or off, not both")
+			}
+			if r.Answer {
+				if r.Flow != "wikidata" && r.Flow != "assemble" {
+					return nil, errors.New("answer: wikidata or assemble only")
+				}
+				args = append(args, "--answer")
+			}
+			if r.NoAnswer {
+				if r.Flow != "assemble" {
+					return nil, errors.New("no_answer: assemble only")
+				}
+				args = append(args, "--no-answer")
+			}
+			if engineFlow[r.Flow] { // the engine flows (apollo.py ENGINE_FLOWS) read after a source's Basic run
+				if r.Source != "" {
+					if !reSlug.MatchString(r.Source) {
+						return nil, errors.New("pick a source")
+					}
+					args = append(args, "--source", r.Source)
+				}
+			}
 		}
 		if a != "" {
 			args = append(args, "--archive", managerPath(goos, a))

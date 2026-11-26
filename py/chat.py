@@ -24,6 +24,8 @@ import threading
 import time
 from pathlib import Path
 
+import settings
+
 HERE = Path(__file__).resolve().parent.parent   # Apollo's folder (the code is in py/)
 MODELS = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
 # hydra-mcp's core tools that read and never write (the archive, its sources and its schema)
@@ -32,9 +34,9 @@ READ_TOOLS = ("guide", "details", "find_entities", "get_records", "explain_entit
               "properties", "vocabularies", "keys", "check")
 MAX_TEXT = 4000                                          # characters kept of one message (Hydra's chatstore keeps as many)
 MAX_MSGS = 50
-TIMEOUT = 600                                            # seconds one reply may take, tools included
-BUDGET_USD = 2                                           # one reply's dollar cap (claude --max-budget-usd)
-VIEWS = ("runs", "configure", "sources", "collections", "history")
+TIMEOUT = None                                           # no time cap unless Settings sets limits.chat_secs (seconds a reply may take)
+BUDGET_USD = None                                        # no dollar cap unless Settings sets limits.chat_usd (claude --max-budget-usd)
+VIEWS = ("runs", "configure", "sources", "collections", "history", "settings")
 _SESSION = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{6}$")
 _JOB = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{6}-\d{1,4}$")
 
@@ -187,9 +189,10 @@ def prompt_text(msgs: list[dict]) -> str:
 def command(model: str, mcp_path: Path, system: str) -> list[str]:
     import proofread
     allowed = ["ToolSearch", *(f"mcp__hydra__{t}" for t in READ_TOOLS)]
+    usd = settings.value("limits.chat_usd", BUDGET_USD)
     return [proofread.claude_path(), "-p", "--model", MODELS[model], "--mcp-config", str(mcp_path), "--strict-mcp-config",
             "--tools", "ToolSearch", "--allowedTools", *allowed, "--append-system-prompt", system,
-            "--max-budget-usd", f"{BUDGET_USD:g}", "--output-format", "stream-json", "--verbose"]
+            *(["--max-budget-usd", f"{float(usd):g}"] if usd is not None else []), "--output-format", "stream-json", "--verbose"]
 
 
 # ---- the job --------------------------------------------------------------------------------------------------------------
@@ -242,13 +245,15 @@ def get(jid: str) -> dict:
             "tools": job.get("tools") or [], "model": job.get("model")}
 
 
-def _lines(cmd: list[str], cwd: Path, stdin_text: str, err_path: Path):
+def _lines(cmd: list[str], cwd: Path, stdin_text: str, err_path: Path, env: dict | None = None):
     """`claude`'s stream-json output, a line at a time; the process is ours to end when the reply runs over TIMEOUT."""
     with open(err_path, "ab") as err:
-        p = subprocess.Popen(cmd, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err,
+        p = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err,
                              text=True, encoding="utf-8", errors="replace")
-        timer = threading.Timer(TIMEOUT, p.kill)
-        timer.start()
+        secs = settings.value("limits.chat_secs", TIMEOUT)
+        timer = threading.Timer(float(secs), p.kill) if secs is not None else None
+        if timer:
+            timer.start()
         try:
             try:
                 p.stdin.write(stdin_text)
@@ -259,7 +264,8 @@ def _lines(cmd: list[str], cwd: Path, stdin_text: str, err_path: Path):
                 yield line
             p.wait()
         finally:
-            timer.cancel()
+            if timer:
+                timer.cancel()
             if p.poll() is None:
                 p.kill()
                 p.wait()
@@ -267,7 +273,7 @@ def _lines(cmd: list[str], cwd: Path, stdin_text: str, err_path: Path):
         yield json.dumps({"type": "_exit", "code": p.returncode})
 
 
-def run(jid: str) -> int:
+def run(jid: str, env: dict | None = None) -> int:
     path = folder() / "jobs" / f"{jid}.json"
     job = _read(path)
     if not job:
@@ -285,7 +291,7 @@ def run(jid: str) -> int:
     cmd = command(job["model"], mcp_path, job.get("system") or SYSTEM)
     result, last, cost, code, err_text = None, "", None, 0, ""
     try:
-        for line in _lines(cmd, d, prompt_text(job["messages"]), d / "jobs" / f"{jid}.err"):
+        for line in _lines(cmd, d, prompt_text(job["messages"]), d / "jobs" / f"{jid}.err", env):
             try:
                 ev = json.loads(line)
             except ValueError:
@@ -336,10 +342,10 @@ def run(jid: str) -> int:
 
 # ---- the command (apollo.py chatstart | chatget | chatrun) ----------------------------------------------------------------
 
-def main(a, run_facts=None) -> int:
+def main(a, run_facts=None, env=None) -> int:
     import base64
     if a.cmd == "chatrun":
-        return run(a.id)
+        return run(a.id, env)
     try:
         if a.cmd == "chatstart":
             raw = base64.urlsafe_b64decode(a.req64 + "=" * (-len(a.req64) % 4))
