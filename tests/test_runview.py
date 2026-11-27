@@ -156,3 +156,26 @@ def test_raw_view_of_a_session_carries_the_call_notes(tmp_path):
     assert first["note"]["recs"] == {"emp-1": {"name": "Ann at Acme", "col": "c1", "schema": "Employment"}}
     assert first["note"]["lint"][0]["say"] == "starts after it ends." and first["note"]["refs_more"] == 3
     assert second["tool"] == "tasks" and "note" not in second and second["step"] is None
+
+
+def test_engine_steps_are_the_same_five_for_every_engine_flow():
+    import apollo
+    for flow in apollo.ENGINE_FLOWS:
+        steps = runview.engine_steps(flow)
+        assert [s["label"] for s in steps] == ["Gather", "Judge", "Check", "Apply", "Report"]
+        assert [s["who"] for s in steps] == ["code", "engine", "code", "code", "code"]
+
+
+def test_engine_flow_follows_the_progress_stage():
+    labels = lambda st, status: [(s["label"], s["state"]) for s in runview.engine_flow("refine", st, status)]
+    assert labels({"stage": "judge", "done": 2, "total": 5}, "running") == [
+        ("Gather", "done"), ("Judge", "now"), ("Check", "next"), ("Apply", "next"), ("Report", "next")]
+    assert runview.engine_flow("refine", {"stage": "judge", "done": 2, "total": 5}, "running")[1]["detail"] == "chunk 2 of 5"
+    assert [s for _l, s in labels({"stage": "apply"}, "running")] == ["done", "done", "done", "now", "next"]
+    assert {s for _l, s in labels({"stage": "report"}, "done")} == {"done"}
+    assert labels({"stage": "judge"}, "died")[1][1] == "skipped"
+
+
+def test_engine_run_has_no_runner_row():
+    rows = runview.session_config_rows({"kind": "engine", "flow": "refine", "model": "claude-opus-5-5"})
+    assert {"label": "Flow", "value": "Refine"} in rows and not any(r["label"] == "Runner" for r in rows)

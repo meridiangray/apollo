@@ -13,10 +13,10 @@ from pathlib import Path
 from runfiles import PLACE_SCHEMAS, SKIPPED, _text_of, fold, run_rows, short_tool
 
 # What a run does, as the window's Flow select names it: key, label. `read` is the page flow; the rest are hydra workflows.
-FLOWS = [("read", "Basic"), ("assemble", "Assemble"), ("refine", "Refine"), ("timeline", "Timeline"), ("places", "Places"), ("stubs", "Stubs"),
+FLOWS = [("read", "Basic"), ("mark", "Mark"), ("fit", "Fit"), ("assemble", "Assemble"), ("refine", "Refine"), ("timeline", "Timeline"), ("places", "Places"), ("stubs", "Stubs"),
          ("enrich", "Enrich"), ("wikidata", "Wikidata"), ("finance", "Finance"), ("wiki", "Curate")]
 FLOW_LABEL = dict(FLOWS)
-FLOW_DOMAIN = {"read": "Records", "assemble": "Graph", "refine": "Graph", "timeline": "Time", "places": "Geo", "stubs": "Profiles",
+FLOW_DOMAIN = {"read": "Records", "mark": "Records", "fit": "Records", "assemble": "Graph", "refine": "Graph", "timeline": "Time", "places": "Geo", "stubs": "Profiles",
                "enrich": "Profiles", "wikidata": "Profiles", "finance": "Finance", "wiki": "Curate"}
 # a flow renamed: its old runs show as the new one (2026-11-26: Links became Wikidata; its merges went to Assemble)
 RENAMED = {"links": "wikidata"}
@@ -26,20 +26,51 @@ OLD_LABELS = {"Read the source": "read", "Read": "read", "Wiki": "wiki", "Sugges
 GRADES = ("haiku", "sonnet", "opus")
 # What New run offers per flow: needs, `after` (the flow whose finished run on the archive it waits for), and the model grades the flow can use with their {default, max} agent counts.
 # Read (the page flow): Haiku readers work pages at once, Sonnet agents work the hard pages at once; no Opus role.
-# A workflow is one Claude Code session; a count is the agents of that grade (the session itself is one of its own grade),
-# the others are sub-agents it may dispatch in parallel. Assemble is one call of code then judgement: nothing to spread.
-_SESSION = {"haiku": {"default": 0, "max": 4}, "sonnet": {"default": 1, "max": 4}, "opus": {"default": 0, "max": 2}}
-# An engine flow (pageflow/engine.py) judges with one model: the person picks its grade (the strongest given an agent).
+# Every other flow is an engine flow (pageflow/engine.py): it judges with one model, and the person picks its grade (the
+# strongest given an agent).
 _ENGINE = {"haiku": {"default": 0, "max": 1}, "sonnet": {"default": 1, "max": 1}, "opus": {"default": 0, "max": 1}}
 FLOW_SPEC = {
     "read": {"needs": "source", "grades": {"haiku": {"default": 4, "max": 8}, "sonnet": {"default": 2, "max": 4}}},
-    **{k: {"needs": "archive", "after": "read", "grades": dict(_ENGINE)} for k in ("assemble", "timeline", "finance", "wikidata", "places",
-                                                                                  "wiki")},
+    **{k: {"needs": "archive", "after": "read", "grades": dict(_ENGINE)}
+       for k in ("assemble", "timeline", "places", "stubs", "enrich", "finance", "wikidata", "wiki")},
+    # Mark: Haiku reads a page at a time; Fit decides the unknowns Mark set aside (Sonnet), once a Mark run is done
+    "mark": {"needs": "archive", "after": "read", "grades": {**_ENGINE, "haiku": {"default": 1, "max": 1}, "sonnet": {"default": 0, "max": 1}}},
+    "fit": {"needs": "archive", "after": "mark", "grades": dict(_ENGINE)},
     # Refine: a final review of the finished set, Opus unless the person picks another grade
     "refine": {"needs": "archive", "after": "assemble", "grades": {**_ENGINE, "sonnet": {"default": 0, "max": 1},
                                                                    "opus": {"default": 1, "max": 1}}},
-    **{k: {"needs": "archive", "after": "read", "grades": dict(_SESSION)} for k in ("stubs", "enrich")},
 }
+
+
+# The stages of an engine run (pageflow/engine.py), once, for Configure's Flow tab and a run's: key, label, the engine phase
+# that marks it in hand (None: it follows its neighbour), who does it (`engine`: the flow's grade judges), note.
+ENGINE_STEPS = (
+    ("gather", "Gather", "gather", "code", "Collects the pages and entries the flow works from."),
+    ("judge", "Judge", "judge", "engine", "Judges them in chunks, one chunk at a time."),
+    ("check", "Check", None, "code", "Checks each judgement against its pages before it is kept."),
+    ("apply", "Apply", "apply", "code", "Writes the kept judgements to the archive once."),
+    ("report", "Report", "report", "code", "Writes the report."))
+
+
+def engine_steps(flow: str) -> list[dict]:
+    """The Flow tab's steps for an engine flow, before a run: the same five for every engine flow."""
+    return [{"key": f"{flow}-{k}", "label": lab, "who": who, "role": flow if who == "engine" else None, "per": "chunk" if k == "judge" else "once",
+             "note": note, "prompts": [], "switch": False, "budget": None} for k, lab, _ph, who, note in ENGINE_STEPS]
+
+
+def engine_flow(flow: str, progress: dict | None, status: str) -> list[dict]:
+    """An engine run's Flow card: engine_steps with a `state` each from the run's progress stage (check is done once apply starts)."""
+    p = progress or {}
+    order = [k for k, *_ in ENGINE_STEPS]
+    here = next((k for k, _l, ph, *_ in ENGINE_STEPS if ph and ph == p.get("stage")), None)
+    at = order.index(here) if here else -1
+    live = status in ("running", "starting", "stopping")
+    out = []
+    for i, s in enumerate(engine_steps(flow)):
+        st = "done" if status == "done" or i < at else "now" if i == at and live else "skipped" if i == at else "next"
+        det = f"chunk {p.get('done') or 0} of {p['total']}" if st == "now" and s["label"] == "Judge" and p.get("total") else ""
+        out.append({**s, "state": st, "detail": det})
+    return out
 
 
 def flow_grades(flow: str) -> dict:
@@ -296,8 +327,8 @@ def config_rows(cfg: dict, rec: dict, state: dict) -> list[dict]:
 
 
 def session_config_rows(rec: dict) -> list[dict]:
-    rows = [("Workflow", str(rec.get("workflow") or str(rec.get("name") or "").removeprefix("workflow-")).capitalize()),
-            ("Model", model_word(rec.get("model"))), ("Runner", "Claude Code")]
+    rows = [("Flow" if rec.get("kind") == "engine" else "Workflow", FLOW_LABEL.get(rec.get("flow")) or str(rec.get("workflow") or str(rec.get("name") or "").removeprefix("workflow-")).capitalize()),
+            ("Model", model_word(rec.get("model"))), ("Runner", None if rec.get("kind") == "engine" else "Claude Code")]   # an engine run has no session
     out = [{"label": a, "value": str(b)} for a, b in rows if b]
     ar = archive_row(rec.get("archive"))
     if ar:
@@ -309,7 +340,7 @@ def session_config_rows(rec: dict) -> list[dict]:
 
 TYPE_GROUPS = [("people", "People", {"Person"}), ("bodies", "Bodies", {"PublicBody", "Organization", "Company"}),
                ("places", "Places", PLACE_SCHEMAS), ("events", "Events", {"Event", "Payment"}),
-               ("ties", "Ties", {"Employment", "Membership", "Representation", "UnknownLink", "Family", "Associate"}),
+               ("ties", "Ties", {"Employment", "Membership", "Representation", "UnknownLink", "Family", "Associate", "Ownership", "Directorship"}),
                ("posts", "Positions", {"Position", "Occupancy"})]
 
 
@@ -390,19 +421,32 @@ def named(rows: list[dict], archive) -> list[dict]:
     return [{**r, "thing": say(r.get("thing") or "")} for r in rows]
 
 
+DID_WORDS = {"merge": "Merged", "apart": "Kept apart", "alias": "Alias", "rename": "Renamed", "retype": "Retyped", "prop": "Changed",
+             "date": "Dated", "order": "Ordered", "bind": "Bound", "none": "No match", "link": "Placed", "tie": "Tied", "stake": "Held",
+             "payment": "Paid", "accept": "Accepted", "reject": "Rejected", "leave": "Left", "ask": "Asked", "answer": "Answered"}
+
+
 def found_entities(rows: list[dict], quote_max: int = 400) -> dict:
-    """{entities: [{key, schema, group, thing, records, pages, cited, recs: [{page, state, quote}]}], types: [{key, label,
-    count}], entity_count}. One entity is one (schema, thing); its records are where it was found (a page and its quote,
-    the same quote on a page once); `cited` once any of them is."""
+    """{entities: [{key, schema, group, thing, records, pages, cited, recs: [{page, state, quote, did?}], did?}], types: [{key,
+    label, count}], dids: [{key, label, count}], entity_count}. One entity is one (schema, thing); its records are where it was
+    found (a page and its quote, the same quote on a page once); `cited` once any of them is. A row that says what a run did to
+    the entity (`did`: {kind, verb, other?, text?, why?}, an engine run's decisions) keeps it, on the record and in `did` (each once,
+    with `run` when the row names its run); `dids` counts the decision kinds, for the one filter on them."""
     ents = {}
     for r in rows:
-        e = ents.setdefault((r.get("schema") or "", r.get("thing") or ""), {"seen": {}, "recs": []})
-        sig = (r.get("page") or 0, (r.get("quote") or "")[:80])
+        e = ents.setdefault((r.get("schema") or "", r.get("thing") or ""), {"seen": {}, "recs": [], "did": {}})
+        did = r.get("did")
+        if did:
+            sig = (did.get("kind"), did.get("verb"), (did.get("other") or {}).get("name"), did.get("text"), r.get("page") or 0, r.get("run"))
+            e["did"].setdefault(sig, {**did, "page": r.get("page") or 0, **({"run": r["run"]} if r.get("run") else {})})
+        sig = (r.get("page") or 0, (r.get("quote") or "")[:80], (did or {}).get("kind"), (did or {}).get("verb"), (did or {}).get("text"), r.get("run"))
         if sig in e["seen"]:
             if r.get("state") == "cited":
                 e["seen"][sig]["state"] = "cited"
             continue
         rec = {"page": r.get("page") or 0, "state": r.get("state") or "", "quote": (r.get("quote") or "")[:quote_max]}
+        if did:
+            rec["did"] = e["did"][(did.get("kind"), did.get("verb"), (did.get("other") or {}).get("name"), did.get("text"), r.get("page") or 0, r.get("run"))]
         e["seen"][sig] = rec
         e["recs"].append(rec)
     order = {key: i for i, (key, _, _) in enumerate(TYPE_GROUPS)}
@@ -410,15 +454,23 @@ def found_entities(rows: list[dict], quote_max: int = 400) -> dict:
     for (schema, thing), e in ents.items():
         recs = sorted(e["recs"], key=lambda x: (x["page"] or 10 ** 9, x["quote"]))
         pages = sorted({x["page"] for x in recs if x["page"]})
-        out.append({"key": f"{schema}|{thing}", "schema": schema, "group": type_group(schema), "thing": thing,
-                    "records": len(recs), "pages": pages, "cited": any(x["state"] == "cited" for x in recs), "recs": recs})
+        item = {"key": f"{schema}|{thing}", "schema": schema, "group": type_group(schema), "thing": thing,
+                "records": len(recs), "pages": pages, "cited": any(x["state"] == "cited" for x in recs), "recs": recs}
+        if e["did"]:
+            item["did"] = sorted(e["did"].values(), key=lambda d: (d["page"] or 10 ** 9, d.get("kind") or ""))
+        out.append(item)
     out.sort(key=lambda e: (order.get(e["group"], 99), e["pages"][0] if e["pages"] else 10 ** 9, e["thing"].lower()))
     types = []
     for key, label, _ in TYPE_GROUPS + [("other", "Other", set())]:
         n = sum(1 for e in out if e["group"] == key)
         if n:
             types.append({"key": key, "label": label, "count": n})
-    return {"entities": out, "types": types, "entity_count": len(out)}
+    kinds = {}
+    for e in out:
+        for k in {d.get("kind") for d in e.get("did") or []}:
+            kinds[k] = kinds.get(k, 0) + 1
+    dids = [{"key": k, "label": DID_WORDS.get(k, str(k).capitalize()), "count": n} for k, n in sorted(kinds.items(), key=lambda kv: -kv[1])]
+    return {"entities": out, "types": types, "dids": dids, "entity_count": len(out)}
 
 
 # ---- the log's rows unfold: which records, which model call, which problems ---------------------------------------------

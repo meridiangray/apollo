@@ -17,9 +17,9 @@ from pathlib import Path
 
 CHOICES = ("confirm", "reject", "none", "dismiss", "clear")
 _ASK = "ask-"
-_BUILD = ("merge-", "place-", "ref-")
+_BUILD = ("mrg-", "plu-", "ref-")      # the build's question keys (hydra review/ids.py MERGE, PLACE, REF)
 _MEMO: dict = {}                      # {archive: (stamp, rows)}: the build's rows are read again only when the build changed
-_WORDS = {"merge-": {"confirm": "Same", "reject": "Different"}, "place-": {"confirm": "Placed there", "reject": "Not there"}}
+_WORDS = {"mrg-": {"confirm": "Same", "reject": "Different"}, "plu-": {"confirm": "Placed there", "reject": "Not there"}}
 
 
 def run_collections(rec: dict) -> set[str]:
@@ -185,7 +185,7 @@ def _read_rows(root: Path, collections: set[str], names: dict) -> list[dict]:
         if not key.startswith(_BUILD) or key not in review or key in {x["id"] for x in open_rows}:
             continue
         raw = review[key]
-        kind = {"merge-": "merge", "place-": "placement", "ref-": "reference"}[key[:key.index("-") + 1]]
+        kind = {"mrg-": "merge", "plu-": "placement", "ref-": "reference"}[key[:key.index("-") + 1]]
         if not mine(*(raw.get(k) for k in ("a", "b", "sub", "sup", "record"))):
             continue
         who = who if who is not None else _answered_by(root)

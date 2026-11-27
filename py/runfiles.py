@@ -333,6 +333,19 @@ class RunFiles:
     def found(self) -> list[dict]:
         return self._found.all() if self.driven else []
 
+    def found_rows(self) -> list[dict]:
+        """What the Found tab and the page boxes read: a page-flow run's found rows as written; an engine run's decisions as the
+        entities they touched (engineentities.rows), each with its `did`."""
+        if self.kind == "engine":
+            import engineentities
+            return engineentities.rows(self)
+        return self.found()
+
+    @property
+    def iso_from_archive(self) -> bool:
+        """An engine run has no Read pass's mentions: a place's country comes from the archive's place record."""
+        return self.kind == "engine"
+
     def models(self) -> list[dict]:
         """models.jsonl: every model call (its answer too, for runs made since the raw log)."""
         return self._models.all() if self.driven else []

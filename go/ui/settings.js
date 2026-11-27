@@ -86,7 +86,7 @@ function secLimits(d) {
   const l = d.limits || {};
   const f = (key, word, v, unit, ph = '') => `<label class=sf><span>${word}</span><span class=pp2><i class=u>${unit === '$' ? '$' : ''}</i>` +
     `<input class="inp n" inputmode=decimal data-k="lim:${key}" data-set="limits.${key}" value="${v == null ? '' : esc(v)}"${ph ? ` placeholder="${ph}"` : ''} aria-label="${word}">${unit === 's' ? 's' : ''}</span></label>`;
-  return `<div class=sgrid>${f('run_usd', 'Run cost', l.run_usd, '$', 'By pages')}${f('chat_usd', 'Chat cost', l.chat_usd, '$')}${f('chat_secs', 'Chat time', l.chat_secs, 's')}</div>`;
+  return `<div class=sgrid>${f('run_usd', 'Run cost', l.run_usd, '$', 'By pages')}${f('chat_usd', 'Chat cost', l.chat_usd, '$')}${f('chat_secs', 'Chat time', l.chat_secs, 's')}${f('page_reach', 'Page reach', d.page_reach, '', '1')}</div>`;
 }
 function secNetwork(d) {
   const n = d.network || {};

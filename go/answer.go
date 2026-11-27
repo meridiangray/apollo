@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// answering: the Questions tab's one click. A question is an agent's (ask-…) or one of the build's (merge-…, place-…,
+// answering: the Questions tab's one click. A question is an agent's (ask-…) or one of the build's (mrg-…, plu-…,
 // ref-…); a choice is an option's number, confirm, reject, none, dismiss, or clear (take the answer back).
 var (
-	reQuestion = regexp.MustCompile(`^(ask|merge|place|ref)-[A-Za-z0-9]{4,40}$`)
+	reQuestion = regexp.MustCompile(`^(ask|mrg|plu|ref)-[A-Za-z0-9]{4,40}$`)
 	reChoice   = regexp.MustCompile(`^([0-9]{1,3}|confirm|reject|none|dismiss|clear)$`)
 )
 
@@ -22,7 +22,7 @@ func AnswerArgs(id string, question, choice string) ([]string, error) {
 		return nil, errString("not a run id")
 	}
 	if !reQuestion.MatchString(question) {
-		return nil, errString("question: an ask-, merge-, place- or ref- id")
+		return nil, errString("question: an ask-, mrg-, plu- or ref- id")
 	}
 	if !reChoice.MatchString(choice) {
 		return nil, errString("choice: an option's number, confirm, reject, none, dismiss or clear")

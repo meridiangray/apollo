@@ -496,6 +496,7 @@ type View struct {
 	// found, by entity (passed on as the manager wrote them)
 	Entities    json.RawMessage `json:"entities,omitempty"`
 	Types       json.RawMessage `json:"types,omitempty"`
+	Dids        json.RawMessage `json:"dids,omitempty"`
 	EntityCount *int            `json:"entity_count,omitempty"`
 	Changes     json.RawMessage `json:"changes,omitempty"`
 	// run: the live Flow card and the run's configuration
@@ -766,7 +767,8 @@ var (
 )
 
 // engineFlow: the flows pageflow/engine.py drives (apollo.py ENGINE_FLOWS); each takes the source its Basic run read.
-var engineFlow = map[string]bool{"assemble": true, "refine": true, "timeline": true, "finance": true, "wikidata": true, "wiki": true, "places": true}
+var engineFlow = map[string]bool{"assemble": true, "refine": true, "timeline": true, "places": true, "stubs": true, "enrich": true,
+	"finance": true, "wikidata": true, "wiki": true}
 
 // StartArgs checks a start and builds the manager's arguments. Every value is one argument of its own; none can
 // start with `-`, so none is read as an option.

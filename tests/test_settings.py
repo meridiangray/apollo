@@ -115,7 +115,7 @@ def test_limits_reach_new_run_and_the_chat(capsys, monkeypatch, tmp_path):
     for key, v in (("limits.run_usd", 3), ("limits.chat_usd", 0.5), ("limits.chat_secs", 120)):
         assert call(capsys, monkeypatch, {"op": "set", "key": key, "value": v})[0] == 0
     assert apollo.default_budget(50) == 3.0
-    assert "--max-budget-usd" in apollo.plan(flow="stubs", archive="/a/arch", dry=True)["command"]      # a set Run cost caps a session
+    assert "--max-budget-usd" in apollo.plan(workflow="stubs", archive="/a/arch", dry=True)["command"]      # a set Run cost caps a session
     cmd = chat.command("haiku", tmp_path / "mcp.json", "sys")
     assert cmd[cmd.index("--max-budget-usd") + 1] == "0.5"
     for bad in ({"key": "limits.chat_usd", "value": "lots"}, {"key": "limits.chat_secs", "value": 5}, {"key": "nope", "value": 1}):
@@ -150,3 +150,13 @@ def test_the_basemap_switch_is_hydras(capsys, monkeypatch, tmp_path):
     assert code == 0 and got["network"] == {"basemap": False}
     assert json.loads((tmp_path / "basemap" / "basemap.json").read_text())["online"] is False
     assert call(capsys, monkeypatch, {"op": "network", "name": "wikidata", "on": True})[0] == 2
+
+
+def test_page_reach_is_kept_and_reaches_the_engine_runs_environment(capsys, monkeypatch):
+    monkeypatch.delenv("HYDRA_PAGE_REACH", raising=False)
+    assert "HYDRA_PAGE_REACH" not in apollo.run_env()
+    assert call(capsys, monkeypatch, {"op": "set", "key": "limits.page_reach", "value": 2})[0] == 0
+    assert apollo.run_env()["HYDRA_PAGE_REACH"] == "2" and settings.load()["limits.page_reach"] == 2
+    assert call(capsys, monkeypatch, {"op": "set", "key": "limits.page_reach", "value": 99})[0] == 2
+    assert call(capsys, monkeypatch, {"op": "set", "key": "limits.page_reach", "value": None})[0] == 0
+    assert "HYDRA_PAGE_REACH" not in apollo.run_env()

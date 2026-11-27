@@ -86,6 +86,15 @@ const WORD = {done: 'done', escalated: 'escalated', 'gave-up': 'gave up', doing:
 // a measure fills as soon as the page has any of it (a page is read in several passes, so it stays "reading" until the last);
 // none on a finished page is the empty mark
 const cellRec = (st, n) => n ? 's' + bin(n) : isDone(st) ? 'z' : off(st);
+// the tab bar of the run view and of Sources: one definition. `attr` is the data attribute a tab's key goes in; a tab in `counted` has a
+// count beside its name (filled by the page that owns the tab: empty while it has none)
+const RUN_TABS = [['run', 'Run'], ['found', 'Found'], ['questions', 'Questions'], ['calls', 'Calls'], ['runs', 'Runs'], ['raw', 'Raw'], ['report', 'Report'], ['data', 'Data']];
+const RUN_COUNTED = ['found', 'questions', 'calls', 'runs'];
+function tabBar(tabs, current, attr, counted, counts = {}) {
+  return `<nav class=tabs role=tablist${attr === 'tab' ? ' id=runtabs' : ''}>${tabs.map(([k, w]) => `<button type=button role=tab data-${attr}=${k}${current ? ` aria-selected=${current === k}` : ''}>${w}` +
+    `${counted.includes(k) ? ` <small>${counts[k] || ''}</small>` : ''}</button>`).join('')}</nav>`;
+}
+$('#runtabs').outerHTML = tabBar(RUN_TABS, '', 'tab', RUN_COUNTED);
 const escMod = h => h.status === 'escalated' || h.status === 'gave-up' ? ' esc' : '';     // escalated: a pattern over its shade, like redacted (owner)
 const HEAT = {
   named: h => state.namedPages && state.namedPages.has(h.page) ? 'tk' : 'tk0',     // Found: where the selected thing is named
@@ -141,8 +150,8 @@ function modelMeters(s) {
 // neither belongs to its archive.
 const FLOW_KEY = {'Read the source': 'read', 'Suggest links': 'wikidata', 'Place names': 'places', 'Fill stubs': 'stubs', 'Enrich': 'enrich',
                   Basic: 'read', Read: 'read', Links: 'wikidata', Places: 'places', Stubs: 'stubs', Assemble: 'assemble', Refine: 'refine', Timeline: 'timeline',
-                  Wikidata: 'wikidata', Finance: 'finance', links: 'wikidata'};     // Links became Wikidata (CZ318): old runs show there
-const LIGHTS = [['read', 'Basic'], ['assemble', 'Assemble'], ['refine', 'Refine'], ['timeline', 'Timeline'], ['places', 'Places'], ['stubs', 'Stubs'],
+                  Wikidata: 'wikidata', Finance: 'finance', links: 'wikidata', Mark: 'mark', Fit: 'fit'};     // Links became Wikidata (CZ318): old runs show there
+const LIGHTS = [['read', 'Basic'], ['mark', 'Mark'], ['fit', 'Fit'], ['assemble', 'Assemble'], ['refine', 'Refine'], ['timeline', 'Timeline'], ['places', 'Places'], ['stubs', 'Stubs'],
                 ['enrich', 'Enrich'], ['wikidata', 'Wikidata'], ['finance', 'Finance']];
 Object.assign(SV, {person: '<path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/>', download: '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/>', links: '<path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/>'});
 const flowKey = s => s.flow_key || FLOW_KEY[s.flow] || (s.kind === 'pageflow' ? 'read' : 'other');
@@ -208,12 +217,12 @@ function srcItem(g) {
     `<span></span><small>${esc(meta)}</small>${lightsHTML(g)}` +
     miniRows(g) + '</li>';
 }
-// the selected source's runs, newest first, in the run's head: one button a run
+// the run on show in the run's head, and a select of the source's other runs, newest first (owner: one run, not a row of them)
 function runSwitch() {
-  const g = groupOf(state.sel);
-  if (!g || g.runs.length < 2) return '';
-  return `<div class="seg runsw" role=radiogroup aria-label=Runs>${g.runs.map(r =>
-    `<button type=button role=radio data-id="${esc(r.id)}" aria-checked=${r.id === state.sel} title="${esc(r.id)}"><i class="dot ${dotOf(r)}"></i>${ic(flowKey(r))}${esc(runName(r))}<time>${clock(r.started)}</time></button>`).join('')}</div>`;
+  const g = groupOf(state.sel), r = state.byId[state.sel];
+  if (!g || !r || g.runs.length < 2) return '';
+  const opts = g.runs.map(x => `<option value="${esc(x.id)}"${x.id === state.sel ? ' selected' : ''}>${esc(runName(x))} · ${esc(clock(x.started))}</option>`).join('');
+  return `<div class=runsw><i class="dot ${dotOf(r)}"></i>${ic(flowKey(r))}<select class=runsel aria-label=Runs title="${esc(r.id)}">${opts}</select></div>`;
 }
 
 async function pollRuns() {
@@ -252,9 +261,8 @@ $('#runlist').addEventListener('click', e => {
   const id = lt ? lt.dataset.id : g && (g.runs.some(r => r.id === state.sel) ? state.sel : g.runs[0].id);
   if (id) { closeCfg(); state.page = null; select(id); layout(); }
 });
-$('#route').addEventListener('click', e => {
-  const b = e.target.closest('.runsw [data-id]');
-  if (b) select(b.dataset.id);
+$('#route').addEventListener('change', e => {
+  if (e.target.matches('.runsel') && e.target.value) select(e.target.value);
 });
 
 function layout() {
@@ -304,7 +312,7 @@ function head() {
   d.classList.toggle('none', !s);
   if (!s) return;
   const g = groupOf(s.id);
-  const ft = $('[data-tab=found]').firstChild, fw = s.kind === 'pageflow' ? 'Found ' : 'Changes ';
+  const ft = $('[data-tab=found]').firstChild, fw = s.kind === 'pageflow' || s.kind === 'engine' ? 'Found ' : 'Changes ';
   if (ft.textContent !== fw) ft.textContent = fw;
   $('[data-tab=report]').hidden = s.kind !== 'pageflow';
   if (state.tab === 'report' && s.kind !== 'pageflow') setTab('run');
@@ -699,13 +707,8 @@ $('#tabbody').addEventListener('click', e => {
   if (pg) { e.stopPropagation(); return gotoPage(pg.dataset.pg); }
   const row = e.target.closest('.lr.op');
   if (row && !e.target.closest('.hm')) return openRow(Number(row.dataset.i));
-  const fr = e.target.closest('.fr[data-k]');
-  if (fr) { state.fnd.sel = state.fnd.sel === fr.dataset.k ? null : fr.dataset.k; return renderFound(state.foundView); }
-  const pk = e.target.closest('[data-pick]');
-  if (pk && state.tab === 'found') { e.preventDefault(); return foundPick(pk.dataset.pick, pk.dataset.schema); }
+  if (state.tab === 'found' && foundClick(e, state.fnd, () => renderFound(state.foundView), foundPick)) return;
   if (e.target.closest('.fbar .lpg')) return clearPick();
-  const fb = e.target.closest('.fbar [data-ft]');
-  if (fb) { state.fnd.type = fb.dataset.ft; state.fnd.sel = null; return renderFound(state.foundView); }
   if (e.target.closest('.fbar .fexp')) { state.fnd.exp = !state.fnd.exp; return renderFound(state.foundView); }
   const xf = e.target.closest('[data-xfmt]'), xb = e.target.closest('[data-xby]');
   if (xf) { state.fnd.fmt = xf.dataset.xfmt; return renderFound(state.foundView); }
@@ -718,6 +721,9 @@ $('#tabbody').addEventListener('click', e => {
 });
 $('#tabbody').addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.lr.op, .fr, .rw, [data-pick]')) { e.preventDefault(); e.target.click(); }
+});
+$('#tabbody').addEventListener('change', e => {
+  if (e.target.matches('.fbar .fdid')) { state.fnd.did = e.target.value; state.fnd.sel = null; renderFound(state.foundView); }
 });
 $('#tabbody').addEventListener('input', e => {
   if (e.target.matches('.fbar .fq')) { state.fnd.q = e.target.value; drawFound(); }
@@ -746,22 +752,17 @@ function renderFound(v) {
   const key = `${state.sel}/found`;
   if (body.dataset.run !== key) {
     body.dataset.run = key;
-    state.fnd = {type: 'all', q: '', sel: null, page: null, quoted: false, fromPick: false, exp: false, fmt: 'jsonl', by: 'none'};
+    state.fnd = {type: 'all', q: '', sel: null, did: '', page: null, quoted: false, fromPick: false, exp: false, fmt: 'jsonl', by: 'none'};
     if (state.fndPick) { Object.assign(state.fnd, state.fndPick, {fromPick: true}); state.fndPick = null; }   /* heat pick */
     body.innerHTML = '<div class="fbar logbar"></div><div class="hm fheat tipped"></div><div class=pv-box-host></div>' +
       '<div class="fgrid fnd2"><div class=fl><div class=flist></div></div><div class=ft></div></div>';
   }
   state.foundView = v;
   if (v.heat && v.heat.length) state.heatRows = v.heat;
-  const f = state.fnd, types = v.types || [];
-  if (f.type !== 'all' && !types.some(t => t.key === f.type)) f.type = 'all';
-  const onPage = f.page ? (v.entities || []).filter(e => e.pages.includes(f.page)) : null;
-  const cnt = (k, n) => onPage ? onPage.filter(e => k === 'all' || e.group === k).length : n;
+  const f = state.fnd;
   const done = !['running', 'starting', 'stopping'].includes((state.byId[state.sel] || {}).status);
-  const bar = `<div class=fchips role=group aria-label="Kind">` +
-    [['all', 'All', cnt('all', v.entity_count || 0)], ...types.map(t => [t.key, t.label, cnt(t.key, t.count)])].filter(([k, , n]) => k === 'all' || n || f.type === k).map(([k, lab, n]) =>
-      `<button type=button class=fc data-ft="${k}" aria-pressed=${f.type === k}>${ic(FC_ICON[k] || 'records')}${lab} <b>${n}</b></button>`).join('') +
-    `</div>${f.page ? `<button type=button class=lpg title="Show every page">${pgw(f.page)} <span aria-hidden=true>×</span></button>` : ''}` +
+  const bar = foundChips(v, f, f.page ? (v.entities || []).filter(e => e.pages.includes(f.page)) : null) +
+    `${f.page ? `<button type=button class=lpg title="Show every page">${pgw(f.page)} <span aria-hidden=true>×</span></button>` : ''}` +
     `<input class=fq type=search placeholder=Find aria-label="Find a thing" value="${esc(f.q)}">` +
     (done ? `<button type=button class="ib fexp" title="Export" aria-label="Export" aria-expanded=${f.exp}>${ic('download')}</button>` : '') +
     (done && f.exp ? expPop(f) : '');
@@ -777,6 +778,53 @@ function renderFound(v) {
   drawFound();
   drawPageBox();
   drawFoundSide();
+}
+// Found's shared parts, for the run view and for Sources (one definition): the entity-type chips and the one compact filter on what a
+// run did, the list of the things, and the right side (the selected thing's card, or the kind's rich view)
+function foundChips(v, f, onPage) {
+  const types = v.types || [], dids = v.dids || [];
+  if (f.type !== 'all' && !types.some(t => t.key === f.type)) f.type = 'all';
+  if (f.did && !dids.some(d => d.key === f.did)) f.did = '';
+  const cnt = (k, n) => onPage ? onPage.filter(e => k === 'all' || e.group === k).length : n;
+  return `<div class=fchips role=group aria-label="Kind">` +
+    [['all', 'All', cnt('all', v.entity_count || 0)], ...types.map(t => [t.key, t.label, cnt(t.key, t.count)])].filter(([k, , n]) => k === 'all' || n || f.type === k).map(([k, lab, n]) =>
+      `<button type=button class=fc data-ft="${k}" aria-pressed=${f.type === k}>${ic(FC_ICON[k] || 'records')}${lab} <b>${n}</b></button>`).join('') + '</div>' +
+    (dids.length > 1 ? `<select class=fdid aria-label="Did"><option value="">Did</option>${dids.map(d => `<option value="${esc(d.key)}"${f.did === d.key ? ' selected' : ''}>${esc(d.label)}</option>`).join('')}</select>` : '');
+}
+const DID_WORD = {merge: 'Merged', apart: 'Kept apart', alias: 'Alias', rename: 'Renamed', retype: 'Retyped', prop: 'Changed', date: 'Dated', order: 'Ordered', bind: 'Bound',
+  none: 'No match', link: 'Placed', tie: 'Tied', stake: 'Held', payment: 'Paid', accept: 'Accepted', reject: 'Rejected', leave: 'Left', ask: 'Asked', answer: 'Answered'};
+function foundList(v, f) {
+  const q = f.q.trim().toLowerCase();
+  const list = (v.entities || []).filter(e => (f.type === 'all' || e.group === f.type) && (!f.page || e.pages.includes(f.page)) &&
+    (!f.did || (e.did || []).some(d => d.kind === f.did)) && (!q || `${e.thing} ${schemaWord(e.schema)}`.toLowerCase().includes(q)))
+    .sort((a, b) => b.pages.length - a.pages.length || a.thing.localeCompare(b.thing));
+  const unit = n => n === 1 ? 'page' : 'pages';
+  const note = e => e.did ? [...new Set(e.did.map(d => DID_WORD[d.kind] || d.verb))].slice(0, 2).join(' · ') : `${e.pages.length} ${unit(e.pages.length)}`;
+  return list.slice(0, 500).map(e => `<div class="fr${f.sel === e.key ? ' sel' : ''}${e.cited ? '' : ' prop'}" data-k="${esc(e.key)}" role=button tabindex=0 aria-pressed=${f.sel === e.key} title="${esc(schemaWord(e.schema))}">` +
+    `<span class=ic>${entityIcon(e.schema)}</span><b>${esc(e.thing)}</b><small>${esc(note(e))}</small></div>`).join('') +
+    (list.length > 500 ? `<div class=mre>${list.length - 500} more: narrow the list</div>` : '') || '<div class=lnone>Nothing matches.</div>';
+}
+function foundSideHTML(v, f, d) {                        // d: the rich data (undefined while it loads, null if none)
+  const e = (v.entities || []).find(x => x.key === f.sel);
+  if (e) return entityCard(e, d);
+  if (f.type === 'all') return '';
+  return d ? PageView.rich(d, f.type) || '<div class=lnone>Nothing to draw.</div>' : '<span class=spin aria-label=Loading role=status></span>';
+}
+// the clicks both Found views share: a thing, a name in a card, a kind chip
+function foundClick(e, f, redraw, pick) {
+  const fr = e.target.closest('.fr[data-k]');
+  if (fr) { f.sel = f.sel === fr.dataset.k ? null : fr.dataset.k; redraw(); return true; }
+  const pk = e.target.closest('[data-pick]');
+  if (pk) { e.preventDefault(); pick(pk.dataset.pick, pk.dataset.schema); return true; }
+  const fb = e.target.closest('.fbar [data-ft]');
+  if (fb) { f.type = fb.dataset.ft; f.sel = null; redraw(); return true; }
+  return false;
+}
+function foundPickIn(v, f, name, schema) {              // a name from a rich view or a trace: the thing in the list, if there
+  const n = String(name || '').toLowerCase();
+  const e = (v.entities || []).find(x => x.thing.toLowerCase() === n && (!schema || x.schema === schema)) || (v.entities || []).find(x => x.thing.toLowerCase() === n);
+  if (e) f.sel = f.sel === e.key ? null : e.key;
+  return !!e;
 }
 // the export choices: the current filter (kind, page), as one file or split by kind or page
 function expPop(f) {
@@ -819,12 +867,8 @@ function drawFoundHeat() {
 }
 const shortName = n => { const w = String(n || '').split(/\s+/).filter(Boolean); return w.length > 1 ? w[w.length - 1] : (w[0] || ''); };
 const foundSel = () => { const v = state.foundView, k = state.fnd.sel; return k && v ? (v.entities || []).find(e => e.key === k) || null : null; };
-function foundPick(name, schema) {                     // a name from a rich view or a trace: the thing in the list, if the run found it
-  const v = state.foundView, n = String(name || '').toLowerCase();
-  const e = (v.entities || []).find(x => x.thing.toLowerCase() === n && (!schema || x.schema === schema)) || (v.entities || []).find(x => x.thing.toLowerCase() === n);
-  if (!e) return;
-  state.fnd.sel = state.fnd.sel === e.key ? null : e.key;
-  renderFound(v);
+function foundPick(name, schema) {
+  if (foundPickIn(state.foundView, state.fnd, name, schema)) renderFound(state.foundView);
 }
 // the run's rich data (all kinds; one page when a page is picked), kept per run and page
 state.rich = {};
@@ -846,11 +890,7 @@ function drawFoundSide() {
   if (!host || !v) return;
   const d = richNow();
   if (d === undefined) loadRich();
-  const e = foundSel();
-  let html;
-  if (e) html = entityCard(e, d);
-  else if (f.type !== 'all') html = d ? PageView.rich(d, f.type) || '<div class=lnone>Nothing to draw.</div>' : '<span class=spin aria-label=Loading role=status></span>';
-  else html = '';
+  const html = foundSideHTML(v, f, d);
   const grid = $('#tabbody .fnd2');
   if (grid) grid.classList.toggle('one', !html);
   if (host.dataset.k !== html) { host.dataset.k = html; host.innerHTML = html; applyCss(host); }
@@ -862,22 +902,27 @@ function entityCard(e, d) {
   const kv = [['Kind', esc(schemaWord(e.schema)), ''], ['Pages', e.pages.slice(0, 12).map(pg).join(' ') + (e.pages.length > 12 ? ` +${e.pages.length - 12}` : ''), ''],
     me && me.h ? ['H-ID', `<code>${esc(me.h)}</code>`, ''] : null, me && me.id ? ['Record', `<code>${esc(me.id)}</code>`, ''] : null].filter(Boolean);
   const tr = [];
-  for (const r of e.recs) tr.push({page: r.page, icon: e.schema, k: schemaWord(e.schema), t: '', d: '', q: r.quote, cited: r.state === 'cited'});
-  for (const t of (d && d.ties) || []) {
+  for (const r of e.recs) {
+    const w = r.did;                                     // what a run did to it: its verb, the other thing, the words, why
+    tr.push(w ? {page: r.page, icon: w.kind, k: w.verb, t: w.other || '', d: w.text || '', q: r.quote, why: w.why, flow: w.flow, did: true}
+      : {page: r.page, icon: e.schema, k: schemaWord(e.schema), t: '', d: '', q: r.quote, cited: r.state === 'cited'});
+  }
+  for (const t of (e.did ? [] : (d && d.ties) || [])) {
     const a = (t.from || {}).name || '', b = (t.to || {}).name || '';
     if (a.toLowerCase() !== n && b.toLowerCase() !== n) continue;
     const other = a.toLowerCase() === n ? t.to : t.from;
     for (const p of t.pages || []) tr.push({page: p, icon: 'links', k: t.kind || schemaWord(t.schema), t: other, d: [t.start, t.end].filter(Boolean).join(' to ') || t.date || '', q: t.quote, cited: t.cited, tie: true});
   }
-  for (const ev of (d && d.events) || []) {
+  for (const ev of (e.did ? [] : (d && d.events) || [])) {
     if (!(ev.who || []).some(w => String(w.name).toLowerCase() === n) || ev.title === e.thing) continue;
     for (const p of ev.pages || []) tr.push({page: p, icon: 'Event', k: 'Event', t: {name: ev.title, schema: 'Event'}, d: ev.date || '', q: ev.quote, cited: ev.cited});
   }
   tr.sort((x, y) => x.page - y.page);
-  const seen = new Set(), rows = tr.filter(x => { const k = `${x.page}|${x.k}|${x.t && x.t.name}|${x.q}`; if (seen.has(k)) return false; seen.add(k); return true; });
-  const li = rows.slice(0, 120).map(x => `<li><div class=m>${pg(x.page)}</div><div class=b>${x.tie ? ic('links') : `<span class=ic>${entityIcon(x.icon)}</span>`}</div><div><div class=h><b>${esc(x.k)}</b>` +
+  const seen = new Set(), rows = tr.filter(x => { const k = `${x.page}|${x.k}|${x.t && x.t.name}|${x.d}|${x.q}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  const li = rows.slice(0, 120).map(x => `<li><div class=m>${x.page ? pg(x.page) : ''}</div><div class=b>${x.tie ? ic('links') : `<span class=ic>${entityIcon(x.icon)}</span>`}</div><div><div class=h><b>${esc(x.k)}</b>` +
     (x.t && x.t.name ? `<a href="#" data-pick="${esc(x.t.name)}" data-schema="${esc(x.t.schema || '')}">${esc(x.t.name)}</a>` : '') + (x.d ? `<span class=d>${esc(x.d)}</span>` : '') +
-    `<span class=grow></span><span class="tag${x.cited ? '' : ' p'}">${x.cited ? 'Cited' : 'Proposed'}</span></div>${x.q ? `<q>${markQuote(x.q, e.thing)}</q>` : ''}</div></li>`).join('');
+    `<span class=grow></span>${x.flow ? `<span class=tag>${esc(x.flow)}</span>` : x.did ? '' : `<span class="tag${x.cited ? '' : ' p'}">${x.cited ? 'Cited' : 'Proposed'}</span>`}</div>` +
+    `${x.why ? `<div class=why>${esc(x.why)}</div>` : ''}${x.q ? `<q>${markQuote(x.q, e.thing)}</q>` : ''}</div></li>`).join('');
   return `<div class=fhead><div><h3>${esc(e.thing)}</h3><div class=k>${entityIcon(e.schema)}${esc(schemaWord(e.schema))} · ${e.pages.length} ${e.pages.length === 1 ? 'page' : 'pages'}</div></div></div>` +
     `<div class=kv>${kv.map(([k, v2]) => `<span class=k>${k}</span><span>${v2}</span><span></span>`).join('')}</div>` +
     `<div class=sect>Trace <small>${rows.length}</small></div><ol class=tr>${li}</ol>`;
@@ -936,13 +981,7 @@ async function drawPageBox() {
 function drawFound() {
   const body = $('#tabbody'), box = $('.flist', body), v = state.foundView;
   if (!box || !v) return;
-  const f = state.fnd, q = f.q.trim().toLowerCase();
-  const list = (v.entities || []).filter(e => (f.type === 'all' || e.group === f.type) && (!f.page || e.pages.includes(f.page)) &&
-    (!q || `${e.thing} ${schemaWord(e.schema)}`.toLowerCase().includes(q))).sort((a, b) => b.pages.length - a.pages.length || a.thing.localeCompare(b.thing));
-  const unit = n => n === 1 ? 'page' : 'pages';
-  const html = list.slice(0, 500).map(e => `<div class="fr${f.sel === e.key ? ' sel' : ''}${e.cited ? '' : ' prop'}" data-k="${esc(e.key)}" role=button tabindex=0 aria-pressed=${f.sel === e.key} title="${esc(schemaWord(e.schema))}">` +
-    `<span class=ic>${entityIcon(e.schema)}</span><b>${esc(e.thing)}</b><small>${e.pages.length} ${unit(e.pages.length)}</small></div>`).join('') +
-    (list.length > 500 ? `<div class=mre>${list.length - 500} more: narrow the list</div>` : '') || '<div class=lnone>Nothing matches.</div>';
+  const html = foundList(v, state.fnd);
   if (box.dataset.k !== html) { box.dataset.k = html; box.innerHTML = html; }
 }
 
@@ -1125,50 +1164,54 @@ function qNext(rows, id) {
 async function qWait() {
   for (let n = 0; n < 50 && state.busy.view; n++) await new Promise(r => setTimeout(r, 100));
 }
-async function answerQ(id, choice, label) {
-  const run = state.sel, rows = qRows(state.view);
+const qRedraw = sv => { if (sv) drawSources(); else { state.viewKey = ''; render(); } };
+async function answerQ(id, choice, label, sv) {
+  const rows = qRows(sv || state.view);
   const was = rows.find(q => q.id === id);
   if (!was) return;
+  const run = sv ? was.run : state.sel;
   state.q.local[id] = choice === 'clear' ? {status: 'open', answer: null}
     : {status: choice === 'dismiss' ? 'dismissed' : 'answered', answer: {choice: label, text: null, by: 'you', at: new Date().toISOString()}};
   state.q.sel = choice === 'clear' ? id : qNext(rows, id);
   state.q.reveal = true;
-  state.viewKey = '';
-  render();
+  qRedraw(sv);
   try {
     await api(`/api/answer/${encodeURIComponent(run)}`, {question: id, choice});
-    await qWait();
-    if (run === state.sel) await pollView();
+    if (sv) await srcViewLoad(state.src.sel, 'questions', true);
+    else { await qWait(); if (run === state.sel) await pollView(); }
   } catch (e) {
     notify('error', `Answer: ${e.message}`);
   }
   delete state.q.local[id];
-  if (run === state.sel && state.tab === 'questions') { state.viewKey = ''; render(); }
+  if (sv ? state.page === 'sources' : run === state.sel && state.tab === 'questions') qRedraw(sv);
 }
-function qMore(id) {
-  const q = qRows(state.view).find(x => x.id === id);
+function qMore(id, sv) {
+  const q = qRows(sv || state.view).find(x => x.id === id);
   if (!q || !qShown(q).more) return;
   state.q.more[id] = (state.q.more[id] || 0) + Q_TOP;
   state.q.sel = id;
-  state.viewKey = '';
-  render();
+  qRedraw(sv);
+}
+// a click in the questions, in the run view or (sv: the source's questions) in Sources
+function qClick(e, sv) {
+  const c = e.target.closest('.qc');
+  if (!c) return false;
+  const id = c.dataset.q, b = e.target.closest('button[data-c]');
+  if (e.target.closest('.undo')) answerQ(id, 'clear', '', sv);
+  else if (e.target.closest('[data-more]')) qMore(id, sv);
+  else if (b) answerQ(id, b.dataset.c, b.dataset.l, sv);
+  else { state.q.sel = state.q.sel === id ? null : id; qRedraw(sv); }
+  return true;
 }
 $('#tabbody').addEventListener('click', e => {
-  if (state.tab !== 'questions') return;
-  const c = e.target.closest('.qc');
-  if (!c) return;
-  const id = c.dataset.q, b = e.target.closest('button[data-c]');
-  if (e.target.closest('.undo')) return answerQ(id, 'clear', '');
-  if (e.target.closest('[data-more]')) return qMore(id);
-  if (b) return answerQ(id, b.dataset.c, b.dataset.l);
-  state.q.sel = state.q.sel === id ? null : id;
-  state.viewKey = '';
-  render();
+  if (state.tab === 'questions') qClick(e);
 });
 document.addEventListener('keydown', e => {                    // ↑ ↓ move between questions; 1–3 the candidates shown, 0 or N none of these, M check for more
-  if (state.tab !== 'questions' || state.page || e.ctrlKey || e.metaKey || e.altKey || !state.view || state.view.tab !== 'questions') return;
+  const onSrc = state.page === 'sources' && state.src.tab === 'questions', sv = onSrc ? srcQView() : null;
+  if (onSrc ? !sv : state.tab !== 'questions' || state.page || !state.view || state.view.tab !== 'questions') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input, textarea, select, dialog, [contenteditable]')) return;
-  const rows = qRows(state.view);
+  const rows = qRows(sv || state.view);
   const i = rows.findIndex(q => q.id === state.q.sel);
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     if (!rows.length) return;
@@ -1176,13 +1219,12 @@ document.addEventListener('keydown', e => {                    // ↑ ↓ move b
     const j = e.key === 'ArrowDown' ? Math.min(rows.length - 1, i + 1) : i < 0 ? rows.length - 1 : Math.max(0, i - 1);
     state.q.sel = rows[j].id;
     state.q.reveal = true;
-    state.viewKey = '';
-    render();
+    qRedraw(sv);
   } else if (/^[0-9mMnN]$/.test(e.key) && i >= 0 && !qDone(rows[i])) {
     const sh = qShown(rows[i]), k = e.key.toLowerCase();
-    if (k === 'm') { if (sh.more) { e.preventDefault(); qMore(rows[i].id); } return; }
+    if (k === 'm') { if (sh.more) { e.preventDefault(); qMore(rows[i].id, sv); } return; }
     const c = k === '0' || k === 'n' ? sh.none : sh.cands[Number(k) - 1];
-    if (c) { e.preventDefault(); answerQ(rows[i].id, c.choice, c.label); }
+    if (c) { e.preventDefault(); answerQ(rows[i].id, c.choice, c.label, sv); }
   }
 });
 
@@ -1278,6 +1320,8 @@ Object.assign(SV, {
   // CZ318: the flows' icons, from Hydra's shipped set (template/.hydra/resources/icons: network, timeline, wiki-w, coins)
   assemble: '<rect x=16 y=16 width=6 height=6 rx=1 /><rect x=2 y=16 width=6 height=6 rx=1 /><rect x=9 y=2 width=6 height=6 rx=1 /><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
   timeline: '<path d="M4 16l6 -7l5 5l5 -6"/><path d="M15 14m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M10 9m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M20 8m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>',
+  mark: '<path d="M3 19h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M12.5 5.5l4 4"/><path d="M4.5 13.5l4 4"/><path d="M21 15v4h-8l4 -4l4 0"/>',
+  fit: '<path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 6l8 0"/><path d="M16 6l4 0"/><path d="M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 12l2 0"/><path d="M10 12l10 0"/><path d="M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 18l11 0"/><path d="M19 18l1 0"/>',
   wikidata: '<text x=11.75 y=19 text-anchor=middle fill=currentColor stroke=none font-family="\'Linux Libertine\',\'Hoefler Text\',Georgia,\'Times New Roman\',serif" font-size=20>W</text>',
   finance: '<path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/><circle cx=16 cy=8 r=6 />',
   wiki: '<path d="M5 4m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M9 4m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M5 8h4"/><path d="M9 16h4"/><path d="M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041z"/><path d="M14 9l4 -1"/><path d="M16 16l3.923 -.98"/>'
@@ -1302,7 +1346,7 @@ Object.assign(SV, {      // Tabler Icons (MIT): the log's other verbs, the Tools
 });
 const STAGE_ICON = {ocr: 'ocr', text: 'text', catalogue: 'catalogue', check: 'check', analyse: 'analyse', read: 'read', escalate: 'Escalated', roster: 'roster', lag: 'lag', rate: 'rate', supervise: 'supervise',
                     review: 'review', stubs: 'stubs', places: 'places', enrich: 'enrich', 'view-prep': 'viewprep', 'close-out': 'closeout',
-                    assemble: 'assemble', refine: 'review', timeline: 'timeline', wikidata: 'wikidata', finance: 'finance'};
+                    assemble: 'assemble', refine: 'review', timeline: 'timeline', wikidata: 'wikidata', finance: 'finance', mark: 'mark', fit: 'fit'};
 const MODELS = [['Haiku', 'claude-haiku-5-5'], ['Sonnet', 'claude-sonnet-5-5'], ['Opus', 'claude-opus-5-5']];   // bronze, silver, gold
 const LIMIT_TIPS = {
   parallel: 'How many pages the reader works on at the same time. More is faster, and puts more calls in flight at once.',
@@ -1375,7 +1419,7 @@ function closeCfg() {
   state.cfg = null;
   layout();
 }
-const stageOf = c => c.detail && c.detail.stages.find(s => s.key === c.sel);
+const stageOf = c => c.detail && (c.detail.stages.find(s => s.key === c.sel) || (ENGINE_FLOWS.includes(c.sel) ? {key: c.sel, kind: 'engine'} : undefined));   // an engine flow has no stage of its own: Dry and Run only
 const mkey = st => st.role || st.key;
 async function loadCfg(source) {
   const c = state.cfg;
@@ -1476,9 +1520,11 @@ const withTools = d => {                          // the Tools group: Analyse (f
 const isTool = st => !!st && (st.kind === 'analyse' || st.kind === 'tool' || st.kind === 'agent');
 // The flows, grouped by the domain they work in (owner: the real runs, not the tools; Analyse, OCR, Text and Catalogue run by
 // themselves when a Read starts). The manager sends the list (configs.flows); this is its shape until it answers.
-const ENGINE_FLOWS = ['assemble', 'refine', 'timeline', 'finance', 'wikidata', 'wiki', 'places'];      // apollo.py ENGINE_FLOWS: driven by pageflow/engine.py
+const ENGINE_FLOWS = ['mark', 'fit', 'assemble', 'refine', 'timeline', 'places', 'stubs', 'enrich', 'finance', 'wikidata', 'wiki'];      // apollo.py ENGINE_FLOWS: driven by pageflow/engine.py
 const FLOW_DEFS = [
   {key: 'read', name: 'Basic', domain: 'Records', needs: 'source', grades: {haiku: {default: 4, max: 12}, sonnet: {default: 1, max: 4}}},
+  {key: 'mark', name: 'Mark', domain: 'Records', needs: 'archive', after: 'read', grades: {haiku: {default: 1, max: 1}, sonnet: {default: 0, max: 1}, opus: {default: 0, max: 1}}},
+  {key: 'fit', name: 'Fit', domain: 'Records', needs: 'archive', after: 'mark', grades: {haiku: {default: 0, max: 1}, sonnet: {default: 1, max: 1}, opus: {default: 0, max: 1}}},
   {key: 'assemble', name: 'Assemble', domain: 'Graph', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 1}}},
   {key: 'refine', name: 'Refine', domain: 'Graph', needs: 'archive', after: 'assemble', grades: {haiku: {default: 0, max: 1}, sonnet: {default: 0, max: 1}, opus: {default: 1, max: 1}}},
   {key: 'timeline', name: 'Timeline', domain: 'Time', needs: 'archive', after: 'read', grades: {sonnet: {default: 1, max: 4}}},
@@ -1494,7 +1540,7 @@ const flowDef = k => flowDefs().find(f => f.key === k) || FLOW_DEFS[0];
 function flowReady(f, c) {
   if (!f.after) return true;
   const p = archivePath(c);
-  if (p && p === draftPath() && ((state.configs.draft || {}).records || 0) > 0) return true;
+  if (f.after !== 'mark' && p && p === draftPath() && ((state.configs.draft || {}).records || 0) > 0) return true;     // Fit waits for a Mark run, whatever the draft holds
   return state.runs.some(r => r.archive === p && flowKey(r) === f.after && r.status === 'done');
 }
 function stageButtons(d, c) {
@@ -1556,7 +1602,7 @@ function drawCfg() {
   const run = `<div class=tqf>${src}
     <label class=f><span>Archive</span><select class=s12 id=cfgarch aria-label=Archive>${archiveOptions(c)}</select></label>
     ${agentsHTML(c)}${ans}
-    <label class=f><span>Runner</span><select class=s9 disabled aria-label=Runner><option>${esc(d.run.runner)}</option></select></label></div>`;
+    ${eng ? "" : `<label class=f><span>Runner</span><select class=s9 disabled aria-label=Runner><option>${esc(d.run.runner)}</option></select></label>`}</div>`;
   const capf = read ? `<div class=f><span class=lh>Cost cap<button type=button class=q aria-describedby=tt-cap aria-label="About the cost cap">?</button></span><span class=pp2>$<input class=n id=cfgcap value="${esc(capText(c))}" inputmode=decimal aria-label="Cost cap in dollars"${dis}></span><span class=tt id=tt-cap role=tooltip>The most this run may spend, in dollars. It finishes the page in hand, then closes and writes the report.</span></div>` : '';
   // Limits only for a Read with Limits on; the readers at once are the Agents field now
   const lim = read && c.limits !== false ? `<div class=sect>Limits</div><div class=lim>${capf}${d.limits.filter(l => l.key !== 'parallel').map(limitHTML).join('')}</div>` : '';
@@ -1621,6 +1667,7 @@ function flowSteps(c) {
   return steps;
 }
 const curStep = c => flowSteps(c).find(s => sk(s) === c.step);
+const engineGrade = c => [...GRADES].reverse().find(g => agentCounts(c)[g]) || 'sonnet';   // pageflow engine: the strongest grade given an agent
 const stepPrompts = (c, s) => s.prompts && s.prompts.length ? s.prompts : c.flow === 'read' ? [] : ['workflow'];
 function drawStage() {
   const c = state.cfg, box = $('#cfgstage');
@@ -1652,7 +1699,7 @@ function stepPanel(c) {
   if (!s) return '';
   const key = s.role || c.flow;
   const cur = c.models[key];
-  const model = s.who === 'code' ? '<span class=none>None</span>'
+  const model = s.who === 'engine' ? `<span>${modelMark(engineGrade(c))}${GRADE_WORD[engineGrade(c)]}</span>` : s.who === 'code' ? '<span class=none>None</span>'
     : `<div class=seg role=radiogroup aria-label=Model>${MODELS.map(([w, id]) => `<button type=button role=radio data-model="${id}" data-mrole="${esc(key)}" aria-checked=${cur === id} title="${esc(modelLabel(id))}">${modelMark(id)}<span>${w}</span></button>`).join('')}</div>`;
   const onKey = STEP_ON[s.key];
   const sw = s.switch && onKey ? `<div class="f sw"><span>On</span><button type=button class="sw2${c.on[onKey] ? ' on' : ''}" role=switch aria-checked=${!!c.on[onKey]} aria-label="${esc(s.label)} on" data-switch="${onKey}"></button></div>` : '';
@@ -2086,6 +2133,8 @@ document.addEventListener('keydown', e => {
   if (state.agentOpen) { state.agentOpen = null; agentRedraw(); return; }
   if (document.querySelector('dialog[open]')) return;       // the dialog closes itself
   if (!$('#path').hidden) { $('#path').hidden = true; return; }
+  if (state.page === 'sources' && state.src.tab === 'questions' && state.q.sel) { state.q.sel = null; drawSources(); return; }
+  if (state.page === 'sources' && state.src.tab === 'found' && state.src.fnd.sel) { state.src.fnd.sel = null; drawSources(); return; }
   if (state.openRow != null && state.tab === 'run') { state.openRow = null; drawLog(); return; }     // Esc folds the open row
   if (state.q.sel && state.tab === 'questions') { state.q.sel = null; state.viewKey = ''; render(); return; }   // Esc deselects the question
   if (state.fnd.exp && state.tab === 'found') { state.fnd.exp = false; renderFound(state.foundView); return; }

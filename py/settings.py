@@ -24,7 +24,8 @@ import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
-LIMITS = {"limits.run_usd": (0.1, 1000.0), "limits.chat_usd": (0.1, 100.0), "limits.chat_secs": (30, 7200)}
+LIMITS = {"limits.run_usd": (0.1, 1000.0), "limits.chat_usd": (0.1, 100.0), "limits.chat_secs": (30, 7200),
+          "limits.page_reach": (0, 20)}
 FOLDERS = {"folders.archives": "APOLLO_ARCHIVES", "folders.sources": "APOLLO_SOURCES"}
 TEST_TIMEOUT = 90                                         # seconds the Test click may take (hydra's own call caps at 30 s)
 
@@ -134,7 +135,7 @@ def page() -> dict:
             "flows": flows,
             "limits": {"run_usd": value("limits.run_usd"), "chat_usd": value("limits.chat_usd", chat.BUDGET_USD),
                        "chat_secs": value("limits.chat_secs", chat.TIMEOUT)},
-            "folders": folders, "network": {"basemap": online}}
+            "page_reach": value("limits.page_reach"), "folders": folders, "network": {"basemap": online}}
 
 
 def _test(model_id: str) -> dict:

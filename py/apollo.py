@@ -481,7 +481,7 @@ def plan(path=None, name=None, model=None, dry=False, fast=False, pages=None, bu
 
 # The flows the engine drives (hydra-mcp-testing/pageflow/engine.py: gather, judge in chunks, check, stage, apply once): no
 # Claude Code session, no checklist for the model. Its progress is page heat in <run>/pageflow/progress.json, as Basic's.
-ENGINE_FLOWS = ("assemble", "refine", "timeline", "finance", "wikidata", "wiki", "places")
+ENGINE_FLOWS = ("mark", "fit", "assemble", "refine", "timeline", "places", "stubs", "enrich", "finance", "wikidata", "wiki")
 
 
 def engine() -> Path:
@@ -636,10 +636,17 @@ def mcp_env() -> dict:
     return {"HYDRA_MCP_READ_CHARS": os.environ.get("HYDRA_MCP_READ_CHARS") or READ_CHARS}
 
 
+def page_reach_env() -> dict:
+    """HYDRA_PAGE_REACH, the pages each way an engine call may add (the engine reads it), when Settings sets it."""
+    import settings
+    v = settings.value("limits.page_reach")
+    return {"HYDRA_PAGE_REACH": str(int(v))} if isinstance(v, (int, float)) and not isinstance(v, bool) else {}
+
+
 def run_env() -> dict:
     """The environment of the process a run starts (`claude -p` or the page-flow driver)."""
     return {**os.environ, "PYTHONUNBUFFERED": "1", "PAGEFLOW_SOURCES_EXTRA": sources_extra(),
-            "MAX_MCP_OUTPUT_TOKENS": os.environ.get("MAX_MCP_OUTPUT_TOKENS") or MCP_OUTPUT_TOKENS, **mcp_env(),
+            "MAX_MCP_OUTPUT_TOKENS": os.environ.get("MAX_MCP_OUTPUT_TOKENS") or MCP_OUTPUT_TOKENS, **mcp_env(), **page_reach_env(),
             "PATH": f"{HOME / '.local' / 'bin'}:{os.environ.get('PATH', '/usr/bin:/bin')}"}
 
 
@@ -1453,6 +1460,9 @@ def _live_flow(rec: dict, files: runfiles.RunFiles, trace: list[dict], p: dict |
             rt = runfiles.route(trace, p, _flush(rec, files), status == "done")
             return {"flow": {"title": "Basic", "steps": runview.flow_steps(steps, rt, trace, files.state(), status == "done", cfg)},
                     "config": runview.config_rows(cfg, rec, files.state())}
+        if rec["kind"] == "engine":
+            return {"flow": {"title": runview.FLOW_LABEL.get(rec.get("flow"), rec.get("flow")), "steps": runview.engine_flow(rec.get("flow"), p, status)},
+                    "config": runview.session_config_rows(rec)}
         wf = rec.get("workflow") or str(rec.get("name") or "").removeprefix("workflow-")
         steps = recipe_detail_cached("full", None)["flows"].get(wf) or []
         return {"flow": {"title": wf.capitalize(), "steps": runview.session_flow(steps, files.tasks(), status)},
@@ -1478,9 +1488,10 @@ def view(rec: dict, tab: str = "run", files: runfiles.RunFiles | None = None, ro
             continue
     out = {"schema": SCHEMA, "id": rec["id"], "kind": rec["kind"], "tab": tab, "run_folder": rec["run_folder"],
            "pages": sorted(pages)}
-    if rec["kind"] == "pageflow":
+    if rec["kind"] in ("pageflow", "engine"):
         ex = exit_info(rec["id"]) or {}
-        out["route"] = runfiles.route(files.trace(), p, _flush(rec, files), ex.get("status") == "done")
+        if rec["kind"] == "pageflow":
+            out["route"] = runfiles.route(files.trace(), p, _flush(rec, files), ex.get("status") == "done")
         if tab in ("run", "report", "found"):              # Found draws the Records row and the Named row (owner: the 24 Nov sketch)
             out["heat"] = runfiles.heat(p, files.state(), files.found(), files.questions())
     elif rec["kind"] == "mcp-session" and tab in ("run", "report", "found"):
@@ -1501,8 +1512,8 @@ def view(rec: dict, tab: str = "run", files: runfiles.RunFiles | None = None, ro
         out.update(_live_flow(rec, files, rows, p))
     elif tab == "found":
         out.update(runfiles.found_groups(files.found()))
-        out.update(runview.found_entities(runview.named(files.found(), rec.get("archive"))))   # ids said by name
-        if rec["kind"] != "pageflow":                        # a workflow run found nothing: it changed what its tasks recorded
+        out.update(runview.found_entities(runview.named(files.found_rows(), rec.get("archive"))))   # ids said by name; an engine run: its decisions on the entities
+        if rec["kind"] not in ("pageflow", "engine"):        # a workflow run found nothing: it changed what its tasks recorded
             out["changes"] = runfiles.workflow_changes(files.archive(), files.window, files.swept())
     elif tab == "raw":
         out["raw"] = runview.raw_view(files, rec["kind"])
@@ -1517,6 +1528,64 @@ def view(rec: dict, tab: str = "run", files: runfiles.RunFiles | None = None, ro
                     "blocks": runfiles.report_blocks(md)})
         if rec["kind"] == "pageflow":
             out["measures"] = runfiles.measures(files.state(), files.calls(), p)
+    return out
+
+
+class SourceFiles:
+    """The runs on one source as one run to the page boxes (pageview.run): their found rows together, every other file the first run's
+    (the Read pass's, when the source has one)."""
+
+    iso_from_archive = True
+
+    def __init__(self, primary: runfiles.RunFiles, rows: list[dict]):
+        self.primary, self.rows = primary, rows
+        self.memo_key = hash(json.dumps(rows, sort_keys=True, default=str))
+
+    def __getattr__(self, name):
+        return getattr(self.primary, name)
+
+    def found(self) -> list[dict]:
+        return self.rows
+
+    found_rows = found
+
+
+def source_runs(slug: str) -> list[dict]:
+    """The runs on a source that read it or work on what it gave: page flows and engine flows, oldest first."""
+    return [r for r in records() if r["kind"] in ("pageflow", "engine") and run_source(r) == slug]
+
+
+def source_view(slug: str, tab: str = "found") -> dict:
+    """Sources' Found and Questions: what all the runs on one source did, as each run's own tab shows it. Found: {entities, types, dids,
+    entity_count, rich}: each entity once, with what every run did to it (`did` has the run's `flow`); `rich` is the page boxes' data
+    for the whole source (pageview.run). Questions: the runs' questions together, each with the `run` that asked it."""
+    import pageview
+    recs = source_runs(slug)
+    if tab == "questions":
+        asked, qs, names = {}, [], {}
+        for rec in recs:
+            files = _files(rec)
+            files.window = run_window(rec)
+            names.update(runview.archive_names(files.archive()))
+            for q in files.questions():
+                if q.get("id") not in asked:
+                    asked[q["id"]] = rec["id"]
+                    qs.append(q)
+        out = runfiles.question_rows(qs, names, [])
+        for row in out["rows"]:
+            row["run"] = asked.get(row["id"])
+        return {"ok": True, "slug": slug, **out}
+    rows, primary = [], None
+    for rec in recs:
+        files = _files(rec)
+        if primary is None or rec["kind"] == "pageflow":
+            primary = (rec, files)
+        flow = runview.flow_label(rec)
+        for r in runview.named(files.found_rows(), rec.get("archive")):
+            rows.append({**r, "run": rec["id"], "did": {**r["did"], "flow": flow}} if r.get("did") else r)
+    out = {"ok": True, "slug": slug, **runview.found_entities(rows)}
+    if primary and rows:
+        out["rich"] = pageview.run(SourceFiles(primary[1], rows), primary[0].get("archive"))
     return out
 
 
@@ -1824,6 +1893,8 @@ def recipe_detail(name: str, source: str | None = None) -> dict:
     for k, lab, _about in WORKFLOWS:
         flows[k] = [{"label": "Claude Code session", "who": "session", "role": k, "per": "once", "note": f"An assistant works through the {lab.lower()} steps on the chosen archive."}] + \
             [{"label": t, "who": "session", "role": k, "per": "step", "note": "", "branch": True} for t in workflow_steps(k)]
+    for k in ENGINE_FLOWS:                                   # the engine flows keep the engine's stages, not a session's steps
+        flows[k] = runview.engine_steps(k)
     # what the window's Flow tab needs of each step: a key, the prompts it uses, whether it has an on/off switch, its budget
     lag_def = cp.load_recipe("lag").get("lag") or {}
 
@@ -2185,6 +2256,10 @@ def main(argv=None) -> int:
     s.add_argument("--req64", required=True)                                                                                   # chat
     for name in ("chatget", "chatrun"):                                                                                         # chat
         sub.add_parser(name, help="the chat bubble: a reply's state" if name == "chatget" else argparse.SUPPRESS).add_argument("--id", required=True)  # chat
+    s = sub.add_parser("sourceview", help="Sources' Found or Questions: what all the runs on a source did (--source SLUG --tab found|questions)")
+    s.add_argument("--source", required=True)
+    s.add_argument("--tab", choices=("found", "questions"), default="found")
+    s.add_argument("--json", action="store_true")
     # entitytrace
     s = sub.add_parser("entitytrace", help="one entity's compact Trace (--record ID, or --name), or a source's entities (--source SLUG)")
     s.add_argument("--archive", required=True)
@@ -2212,6 +2287,13 @@ def main(argv=None) -> int:
     if a.cmd in ("chatstart", "chatget", "chatrun"):                 # chat
         import chat
         return chat.main(a, lambda rid: (lambda r: summary(r) if r else None)(find(rid)), run_env())
+    if a.cmd == "sourceview":
+        try:
+            out = source_view(a.source, a.tab)
+        except (OSError, ValueError) as e:
+            out = {"ok": False, "why": str(e)}
+        print(json.dumps(out, ensure_ascii=False))
+        return 0 if out.get("ok") else 2
     if a.cmd == "entitytrace":                                      # entitytrace
         out = entitytrace_command(a)
         print(json.dumps(out, ensure_ascii=False))
@@ -2397,8 +2479,8 @@ def main(argv=None) -> int:
     # pageview
     if a.cmd == "pageview":
         import pageview
-        if rec["kind"] != "pageflow":
-            out = {"ok": False, "why": "only a page-flow run has pages"}
+        if rec["kind"] not in ("pageflow", "engine"):
+            out = {"ok": False, "why": "only a page-flow or engine run has pages"}
         else:
             try:
                 if a.all:

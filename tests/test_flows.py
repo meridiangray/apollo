@@ -71,9 +71,9 @@ def test_a_run_has_no_cost_cap_unless_the_person_sets_one(monkeypatch):
     assert apollo.plan(flow="read", source="pollard", pages="1-11", name="a")["budget_usd"] is None
     assert apollo.plan(flow="read", source="pollard", pages="1-50", name="b")["budget_usd"] is None
     assert apollo.plan(flow="read", source="pollard", pages="1-50", budget="3", name="c")["budget_usd"] == 3
-    wf = apollo.plan(flow="stubs", archive="/a/arch", dry=True)
+    wf = apollo.plan(workflow="stubs", archive="/a/arch", dry=True)
     assert wf["budget_usd"] is None and "--max-budget-usd" not in wf["command"]
-    assert "--max-budget-usd" in apollo.plan(flow="stubs", archive="/a/arch", dry=True, budget="2")["command"]
+    assert "--max-budget-usd" in apollo.plan(workflow="stubs", archive="/a/arch", dry=True, budget="2")["command"]
 
 
 def test_hard_pages_off_stops_the_escalations_and_rate_off_drops_the_rubric():
@@ -107,8 +107,8 @@ def test_a_flow_into_the_draft_adds_its_collections_to_it_with_the_sources_prefi
     assert "view_copy" not in cfg["archive"]
     fresh = cfg_of(apollo.plan(flow="read", source="pollard", pages="1-3", archive="new", name="e", dry=True))
     assert not fresh["archive"].get("existing") and fresh["archive"]["path"].endswith("/archives/" + fresh["run"] + "/pollard-da")
-    wf = apollo.plan(flow="stubs", archive="draft", dry=True)
-    assert wf["kind"] == "mcp-session" and wf["archive"] == str(draft) and wf["flow"] == "stubs"
+    wf = apollo.plan(flow="stubs", archive="draft", source="pollard", dry=True)
+    assert wf["kind"] == "engine" and wf["archive"] == str(draft) and wf["flow"] == "stubs"
 
 
 def test_a_page_flow_adds_only_to_an_archive_of_apollos_own(tmp_path, draft):
@@ -331,21 +331,24 @@ def test_a_run_is_named_by_its_flow_and_its_source_and_an_old_recipe_run_still_s
     assert s["flow"] == "Basic" and s["source_title"] == "The Jonathan Jay Pollard Espionage Case: A Damage Assessment"
     old = apollo.plan(recipe="smoke", source="pollard", dry=True)
     assert apollo.summary({**old, "started": "2026-11-25T10:00:00"})["flow"] == "Basic"
-    wf = apollo.plan(flow="enrich", archive="/a/arch", dry=True)
+    wf = apollo.plan(flow="enrich", archive="/a/arch", source="pollard", dry=True)
     assert apollo.summary({**wf, "started": "2026-11-25T10:00:00"})["flow"] == "Enrich"
 
 
 def test_flow_names_domains_and_agents():
     import apollo, runview
-    assert [f["name"] for f in runview.flow_catalogue()] == ["Basic", "Assemble", "Refine", "Timeline", "Places", "Stubs", "Enrich", "Wikidata",
-                                                            "Finance", "Curate"]
-    assert [f["domain"] for f in runview.flow_catalogue()] == ["Records", "Graph", "Graph", "Time", "Geo", "Profiles", "Profiles", "Profiles",
-                                                              "Finance", "Curate"]
+    assert [f["name"] for f in runview.flow_catalogue()] == ["Basic", "Mark", "Fit", "Assemble", "Refine", "Timeline", "Places", "Stubs", "Enrich",
+                                                            "Wikidata", "Finance", "Curate"]
+    assert [f["domain"] for f in runview.flow_catalogue()] == ["Records", "Records", "Records", "Graph", "Graph", "Time", "Geo", "Profiles", "Profiles",
+                                                              "Profiles", "Finance", "Curate"]
+    assert apollo.agents_for("mark", None) == {"haiku": 1, "sonnet": 0, "opus": 0} and apollo.engine_grade(apollo.agents_for("mark", None)) == "haiku"
+    assert apollo.agents_for("fit", None) == {"haiku": 0, "sonnet": 1, "opus": 0} and apollo.engine_grade(apollo.agents_for("fit", None)) == "sonnet"
+    assert {"mark", "fit"} <= set(apollo.ENGINE_FLOWS)
     assert runview.flow_key({"flow": "Fill stubs"}) == "stubs" and runview.flow_label({"kind": "pageflow"}) == "Basic"
     assert runview.flow_key({"name": "workflow-links", "kind": "mcp-session"}) == "wikidata"         # Links became Wikidata
     assert runview.flow_key({"flow": "links"}) == runview.flow_key({"flow": "Suggest links"}) == "wikidata"
     assert apollo.agents_for("read", None) == {"haiku": 4, "sonnet": 2}
-    assert apollo.agents_for("stubs", {"haiku": 3}) == {"haiku": 3, "sonnet": 1, "opus": 0}
+    assert apollo.agents_for("stubs", {"haiku": 1}) == {"haiku": 1, "sonnet": 1, "opus": 0}
     for flow, bad in (("read", {"opus": 1}), ("read", {"haiku": 0}), ("assemble", {"sonnet": 2}), ("stubs", {"sonnet": 9})):
         with pytest.raises(ValueError):
             apollo.agents_for(flow, bad)
@@ -423,7 +426,7 @@ def test_a_run_lifts_the_mcp_reply_cap_and_sets_one_read_size(monkeypatch):
     assert env["MAX_MCP_OUTPUT_TOKENS"] == "100000" and env["HYDRA_MCP_READ_CHARS"] == "40000"
     monkeypatch.setenv("MAX_MCP_OUTPUT_TOKENS", "150000")                     # the person's own setting stands
     assert apollo.run_env()["MAX_MCP_OUTPUT_TOKENS"] == "150000"
-    rec = apollo.plan(flow="stubs", archive="/a/arch", dry=True, pages="5-9")
+    rec = apollo.plan(workflow="stubs", archive="/a/arch", dry=True, pages="5-9")
     client = json.loads(next(t for f, t in rec["files"].items() if f.endswith("mcp.json")))
     assert client["mcpServers"]["hydra"]["env"]["HYDRA_MCP_READ_CHARS"] == "40000"
     prompt = next(t for f, t in rec["files"].items() if f.endswith("prompt.md"))

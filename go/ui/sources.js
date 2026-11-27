@@ -118,22 +118,40 @@ function sourceCard(r) {
   const portrait = `<aside class="side portrait srportrait"><table class=infobox><caption>${esc(r.title)}</caption><tr><td colspan=2 class=img>${pic}</td></tr>${infoRows(r)}</table></aside>`;
   return `<div class=srcard><div class=srkv>${acc ? `<table class=infobox><tbody>${acc}</tbody></table>` : ''}${pend}</div>${portrait}</div>`;
 }
-// (owner) a source has tabs like a run: its catalogue, what was found in it, its pages, the runs on it
-const SRC_TABS = [['catalogue', 'Catalogue'], ['found', 'Found'], ['pages', 'Pages'], ['runs', 'Runs']];
+// (owner) a source has tabs like a run: the run view's tab bar (app.js tabBar), its Found and its Questions (the same renderers)
+const SRC_TABS = [['catalogue', 'Catalogue'], ['found', 'Found'], ['pages', 'Pages'], ['questions', 'Questions'], ['runs', 'Runs']];
 state.src.tab = SRC_TABS.some(t => t[0] === store.get('apollo-srctab')) ? store.get('apollo-srctab') : 'catalogue';
-state.src.ftype = '';
-function sourceTabs(r, ents, runs) {
-  const n = {found: ents.length, runs: runs.length};
-  return `<nav class=tabs role=tablist>${SRC_TABS.map(([k, w]) => `<button type=button role=tab data-stab=${k} aria-selected=${state.src.tab === k}>${w}${n[k] ? ` <small>${n[k]}</small>` : ''}</button>`).join('')}</nav>`;
+state.src.fnd = {type: 'all', q: '', sel: null, did: ''};
+state.src.sv = {};                                       // `${slug}|${tab}`: {at, v}: what all the runs on a source did (the manager's sourceview)
+async function srcViewLoad(slug, tab, force) {
+  const k = `${slug}|${tab}`, c = state.src.sv[k] = state.src.sv[k] || {at: 0, v: null};
+  if (c.busy || (!force && Date.now() - c.at < 5000)) return;
+  c.busy = true;
+  try {
+    const v = await api(`/api/sourceview?source=${encodeURIComponent(slug)}&tab=${tab}`);
+    if (JSON.stringify(v) !== JSON.stringify(c.v)) { c.v = v; if (state.page === 'sources') drawSources(); }
+  } catch (e) {
+    notify('error', `Sources: ${e.message}`);
+  }
+  c.busy = false;
+  c.at = Date.now();
 }
-function sourceFound(ents) {
-  const kinds = [...new Set(ents.map(e => e.schema))];
-  if (state.src.ftype && !kinds.includes(state.src.ftype)) state.src.ftype = '';
-  const shown = state.src.ftype ? ents.filter(e => e.schema === state.src.ftype) : ents;
-  const chips = kinds.length > 1 ? `<div class=fchips role=group aria-label=Kind><button type=button class=fc data-sft="" aria-pressed=${!state.src.ftype}>All <b>${ents.length}</b></button>` +
-    kinds.map(k => `<button type=button class=fc data-sft="${esc(k)}" aria-pressed=${state.src.ftype === k}>${entityIcon(k)}${esc(schemaWord(k))} <b>${ents.filter(e => e.schema === k).length}</b></button>`).join('') + '</div>' : '';
-  // the chips head the list's column: when they wrap, the Selected card beside them stays where it is (as in Collections)
-  return `<div class=srcart><div class=srcmain>${chips}${etList('src', shown, draftPath(), null)}</div><aside class="side portrait" id=portrait aria-label=Selected>${etCard()}</aside></div>`;
+const srcView = (slug, tab) => (state.src.sv[`${slug}|${tab}`] || {}).v;
+const srcQView = () => { const r = srcSel(), v = r && srcView(r.slug, 'questions'); return v ? {...v, id: `src:${r.slug}`} : null; };
+function sourceTabs(r, runs) {
+  const f = srcView(r.slug, 'found'), q = srcView(r.slug, 'questions');
+  return tabBar(SRC_TABS, state.src.tab, 'stab', ['found', 'questions', 'runs'], {found: f && f.entity_count, questions: q && q.open, runs: runs.length});
+}
+function sourceFound(r) {
+  const v = srcView(r.slug, 'found'), f = state.src.fnd;
+  if (!v) return '<span class=spin aria-label=Loading role=status></span>';
+  const side = foundSideHTML(v, f, v.rich || null);
+  return `<div class="fbar logbar">${foundChips(v, f, null)}<input class=fq type=search placeholder=Find aria-label="Find a thing" value="${esc(f.q)}"></div>` +
+    `<div class="fgrid fnd2${side ? '' : ' one'}"><div class=fl><div class=flist>${foundList(v, f)}</div></div><div class=ft>${side}</div></div>`;
+}
+function sourceQuestions(r) {
+  const v = srcQView();
+  return v ? questionsTab(v) || '' : '<span class=spin aria-label=Loading role=status></span>';
 }
 function sourceRuns(runs) {
   return runs.map(x => `<div class=fr data-run="${esc(x.id)}" role=button tabindex=0><span class=ic>${ic(flowKey(x))}</span><b>${esc(runName(x))}</b>` +
@@ -233,11 +251,11 @@ function drawSources() {
   if (!state.src.sel && rows.length) { state.src.sel = rows[0].slug; const f = rows[0]; if (f.kind !== 'media') catLoad(f.slug); etSourceLoad(f.slug, f.title); }
   const r = srcSel();
   const rail = `<h2>Sources <small>${rows.length || ''}</small></h2>${filterRow(srcRows())}<div class=scroll><ol class="rl srl">${adding}${rows.map(sourceItem).join('')}</ol></div><div class=bay id=bay>${bayHTML()}</div>`;
-  const ents = r ? (state.et.src[r.slug] || {}).ents || [] : [];
   const runs = r ? ((state.groups || []).find(x => x.key === 'src:' + r.slug) || {runs: []}).runs : [];
   const tab = state.src.tab;
-  const body = !r ? '' : tab === 'found' ? sourceFound(ents) : tab === 'pages' ? sourcePagesTab(r) : tab === 'runs' ? sourceRuns(runs) : sourceCard(r);
-  const main = r ? `${sourceHead(r)}${sourceTabs(r, ents, runs)}<div class=stab>${body}</div>` : '';
+  if (r && r.kind !== 'media') { srcViewLoad(r.slug, 'found'); srcViewLoad(r.slug, 'questions'); }
+  const body = !r ? '' : tab === 'found' ? sourceFound(r) : tab === 'pages' ? sourcePagesTab(r) : tab === 'questions' ? sourceQuestions(r) : tab === 'runs' ? sourceRuns(runs) : sourceCard(r);
+  const main = r ? `${sourceHead(r)}${sourceTabs(r, runs)}<div class=stab>${body}</div>` : '';
   const html = `<section class="panel xrail">${rail}</section><section class="panel xmain">${main}</section>`;
   if (box.dataset.k === html) return;
   const keep = document.activeElement && box.contains(document.activeElement) && document.activeElement.matches('input,textarea') ? document.activeElement : null;
@@ -284,8 +302,11 @@ const srcOf = el => { const li = el.closest('.srow'); return li && li.dataset.sl
 $('#srcpanel').addEventListener('click', async e => {
   const st = e.target.closest('[data-stab]');
   if (st) { state.src.tab = st.dataset.stab; store.set('apollo-srctab', state.src.tab); drawSources(); return; }
-  const sft = e.target.closest('[data-sft]');
-  if (sft) { state.src.ftype = sft.dataset.sft; drawSources(); return; }
+  const sv = srcSel() && srcView(srcSel().slug, 'found');
+  if (state.src.tab === 'found' && sv && foundClick(e, state.src.fnd, drawSources, (n, sc) => { if (foundPickIn(sv, state.src.fnd, n, sc)) drawSources(); })) return;
+  if (state.src.tab === 'questions' && qClick(e, srcQView())) return;
+  const pg = e.target.closest('.stab [data-pg]');           // a page named in a card: its text, in Pages
+  if (pg && state.src.sel) { state.src.tab = 'pages'; state.src.page = Number(pg.dataset.pg); sourcePageText(state.src.sel, state.src.page); drawSources(); return; }
   const cell = e.target.closest('.srcheat .r i[data-p]');
   if (cell && state.src.sel) { const p = Number(cell.dataset.p); state.src.page = state.src.page === p ? null : p; if (state.src.page) sourcePageText(state.src.sel, p); drawSources(); return; }
   const rn = e.target.closest('.stab [data-run]');
@@ -374,7 +395,7 @@ function selectSource(slug) {
   if (state.src.sel === slug) return;
   state.src.sel = slug;
   state.src.page = null;
-  state.src.ftype = '';
+  state.src.fnd = {type: 'all', q: '', sel: null, did: ''};
   state.et.sel = null;
   if (state.src.sel) { const r = srcSel(); if (!r || r.kind !== 'media') catLoad(state.src.sel); etSourceLoad(state.src.sel, r && r.title); }
   drawSources();
@@ -386,6 +407,19 @@ function toggleWiki(open) {
   if (w.open) { const q = $('#wikif .wq'); if (q) q.focus(); }
 }
 // Wikipedia: one article, fetched only when Add is pressed. The manager does it with hydra's own text extraction.
+$('#srcpanel').addEventListener('input', e => {
+  if (!e.target.matches('.fbar .fq')) return;
+  state.src.fnd.q = e.target.value;
+  drawSources();
+  const q = $('#srcpanel .fbar .fq');                    // the redraw replaced the field: the cursor goes back into it
+  if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+});
+$('#srcpanel').addEventListener('change', e => {
+  if (e.target.matches('.fbar .fdid')) { state.src.fnd.did = e.target.value; state.src.fnd.sel = null; drawSources(); }
+});
+$('#srcpanel').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.stab .fr, .stab [data-pick]')) { e.preventDefault(); e.target.click(); }
+});
 $('#srcpanel').addEventListener('input', e => {
   if (e.target.closest('#wikif')) state.src.wiki[e.target.name === 'lang' ? 'lang' : 'q'] = e.target.value;
 });

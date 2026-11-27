@@ -218,6 +218,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /entitytrace.js", files)              // entity trace
 	mux.Handle("GET /pageview.js", files)                 // pageview
 	mux.HandleFunc("GET /api/pageview", s.pageview)       // pageview
+	mux.HandleFunc("GET /api/sourceview", s.sourceview)   // Sources: Found and Questions
 	mux.HandleFunc("POST /api/export/{id}", s.export)     // export
 	mux.HandleFunc("POST /api/answer/{id}", s.answer)     // answering
 	s.chatRoutes(mux, files)                              // chat: /chat.js, /chat.css, /api/chat

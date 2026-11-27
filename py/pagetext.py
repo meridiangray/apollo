@@ -71,16 +71,16 @@ def _pdf_page(pdf: Path, n: int) -> str:
 
 def source_pages(source: str, archive=None, pages=None) -> dict[int, str]:
     """{page: text} of `source` exactly as the page-flow driver sees it: hydra's own text of the file, split by
-    pageflow/triage.py `split_pages` (a PDF's pages, else parts of the source's `part_chars`). `pages`: the page numbers
+    hydra.sources.pagesplit `split_pages` (a PDF's pages, else parts of the source's `part_chars`). `pages`: the page numbers
     wanted (any iterable of ints), default all; a page the source lacks is left out. `archive`: the archive a run works
     in; the text is the source file's, the same in every archive."""
-    import triage                                            # pageflow/triage.py (runfiles puts pageflow on sys.path)
+    from hydra.sources import pagesplit                      # hydra's page split: the driver and read_source use it too
     from hydra_mcp import files
     prof = _profile(source)
     f = _file(prof)
     if not f.is_file():
         raise ValueError(f"the source's file is missing: {f.name}")
-    got, _ = triage.split_pages(files.read(f), prof.get("part_chars"))
+    got, _ = pagesplit.split_pages(files.read(f), prof.get("part_chars"))
     return got if pages is None else {n: got[n] for n in pages if n in got}
 
 

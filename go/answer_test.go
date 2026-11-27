@@ -13,7 +13,7 @@ func TestAnswerArgsCheckEveryValue(t *testing.T) {
 		t.Fatalf("a good click: %v %v", got, err)
 	}
 	for _, c := range []string{"confirm", "reject", "none", "dismiss", "clear", "12"} {
-		if _, err := AnswerArgs("run-1", "merge-1fdcee78dc61f9af", c); err != nil {
+		if _, err := AnswerArgs("run-1", "mrg-1fdcee78dc61f9af", c); err != nil {
 			t.Fatalf("choice %s: %v", c, err)
 		}
 	}

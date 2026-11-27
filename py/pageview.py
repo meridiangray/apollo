@@ -189,7 +189,7 @@ def _mention_countries(files, pages) -> dict:
 
 def strip(files, archive=None) -> dict:
     """The run's pages, one cell each: {ok, pages: [{page, status, records, words, red, label, section}], sections?, redaction?, evidence}."""
-    found = files.found()
+    found = files.found_rows()
     prog = files.progress() or {}
     tri = _triage(files)
     cs = cells(prog, found)
@@ -396,6 +396,12 @@ def _places(files, page, rows: list[dict], pages_of: dict | None = None) -> dict
     for m in _mention_countries(files, page if isinstance(page, (list, tuple, set)) else [page]).values():
         for k, v in m.items():
             iso_of.setdefault(k, v)
+    if getattr(files, "iso_from_archive", False):         # a run with no Read pass: the archive's place record says its country
+        for r in archive_records(files.archive()):
+            cc = (r.get("properties") or {}).get("country") or []
+            nm = ((r.get("properties") or {}).get("name") or [""])[0]
+            if r.get("schema") in PLACE_SCHEMAS and nm and cc and isinstance(cc[0], str):
+                iso_of.setdefault(nm.lower(), (cc[0].upper(), ""))
     cty, loose = {}, []
     for k, nm in by.items():
         iso, kind = iso_of.get(k, (None, ""))
@@ -452,7 +458,7 @@ def page(files, n: int, archive=None) -> dict:
         return {"ok": False, "why": f"page {n} is not one of this run's pages"}
     i = pages.index(n)
     cell = st["pages"][i]
-    rows = _page_rows(named(files.found(), archive), n)                 # ids said by name (runview.named)
+    rows = _page_rows(named(files.found_rows(), archive), n)                 # ids said by name (runview.named)
     out = {"ok": True, "unit": st["unit"], "page": n, "prev": pages[i - 1] if i else None, "next": pages[i + 1] if i + 1 < len(pages) else None}
     if cell.get("label") and cell["label"] != str(n):
         out["label"] = cell["label"]
@@ -587,7 +593,7 @@ def _tie(rec: dict | None, thing: str, names: dict, by_id: dict) -> dict:
 def _run_key(files, archive, group, page) -> tuple:
     root = Path(str(archive or ""))
     cols = sorted((root / "collections").glob("*.json")) if root.is_dir() else []
-    return (str(files.folder), group, page, _stamp(files.pf / "found.jsonl"), _stamp(files.pf / "pages"), _stamp(files.pf / "state.json"),
+    return (str(files.folder), getattr(files, "memo_key", None), group, page, _stamp(files.pf / "found.jsonl"), _stamp(files.pf / "pages"), _stamp(files.pf / "state.json"),
             _stamp(files.folder / "roster.json"), _stamp(root / "universe" / "canon.jsonl"), tuple((f.name, _stamp(f)) for f in cols))
 
 
@@ -603,7 +609,7 @@ def run(files, archive=None, group: str | None = None, page: int | None = None) 
     if key in _RUN_MEMO:
         return _RUN_MEMO[key]
     wanted = (group,) if group else GROUPS
-    rows = [r for r in _page_rows(named(files.found(), archive), page) if type_group(r.get("schema") or "") in wanted]
+    rows = [r for r in _page_rows(named(files.found_rows(), archive), page) if type_group(r.get("schema") or "") in wanted]
     pages = sorted({r["page"] for r in rows})
     by_page = {}
     for r in rows:
@@ -706,7 +712,7 @@ def export_records(files, archive=None, group: str | None = None, page: int | No
     by_id = {r["id"]: r for r in archive_records(archive)}
     order = {k: i for i, k in enumerate(GROUPS)}
     out = []
-    rows = sorted(_page_rows(named(files.found(), archive), page), key=lambda r: (r["page"], order.get(type_group(r.get("schema") or ""), 99), r["thing"].lower()))
+    rows = sorted(_page_rows(named(files.found_rows(), archive), page), key=lambda r: (r["page"], order.get(type_group(r.get("schema") or ""), 99), r["thing"].lower()))
     for r in rows:
         schema = r.get("schema") or ""
         g = type_group(schema)

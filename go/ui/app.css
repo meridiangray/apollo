@@ -245,13 +245,13 @@ ol.rl{list-style:none;margin:0;padding:0}
 button.lt{cursor:pointer;color:var(--link);background:var(--chip-d)}
 button.lt:hover{border-color:var(--link)}
 .lt.live{color:var(--accent)}.lt.budget{color:var(--warnline)}.lt.failed{color:var(--red)}
-/* the selected source's runs, in the run's head */
-.runsw{margin:.55rem 0 .5rem;max-width:100%;overflow-x:auto}
+/* the run on show in the run's head, the source's other runs in its select */
+.runsw{display:inline-flex;align-items:center;gap:.45rem;margin:.55rem 0 .5rem;max-width:100%;padding:.2rem .3rem .2rem .7rem;border:1px solid var(--line);border-radius:999px;background:var(--panel);--ic:14px}
 .detail .now:empty{display:none}
-.runsw button{gap:.4rem;white-space:nowrap;--ic:14px}
-.runsw button .ic svg{width:var(--ic);height:var(--ic);display:block}
-.runsw .dot{width:.45rem;height:.45rem}
-.runsw time{color:var(--muted);font-size:.76rem;font-weight:400;font-variant-numeric:tabular-nums}
+.runsw .ic svg{width:var(--ic);height:var(--ic);display:block}
+.runsw .dot{width:.45rem;height:.45rem;flex:none}
+.runsw .runsel{border:0;background:transparent;color:var(--ink);font:inherit;font-size:.86rem;max-width:min(32rem,100%);text-overflow:ellipsis;cursor:pointer;padding:.15rem .2rem}
+.runsw .runsel:focus-visible{outline:2px solid var(--link);outline-offset:2px;border-radius:6px}
 
 /* proposal: the run's head: name, state, the Route (Tasks Route), the measures */
 .detail .dhead h2{margin:.65rem 0 .1rem}
@@ -559,7 +559,7 @@ dialog.reg{position:absolute;inset:0;margin:auto;height:max-content;width:30rem;
 .stg{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem .35rem}
 .stg .sep{align-self:stretch;width:1px;margin:0 .5rem;background:var(--line)}
 /* Configure flows: one plain grid of icon-over-name tiles */
-.sgs{display:grid;grid-template-columns:repeat(auto-fill,4.3rem);gap:.35rem .25rem;flex:1 1 24rem;min-width:0;align-items:start}   /* fixed tiles: they never re-space when the Run area changes */
+.sgs{display:grid;grid-template-columns:repeat(auto-fill,3.9rem);gap:.35rem .25rem;flex:1 1 24rem;min-width:0;align-items:start}   /* fixed tiles: they never re-space when the Run area changes */
 .sb{display:flex;flex-direction:column;align-items:center;gap:.25rem;min-width:0;padding:.2rem .1rem;border:0;background:none;cursor:pointer;color:var(--ink)}
 .sb .bi{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--link)}
 .sb .bi .ic{width:1.3rem;height:1.3rem;margin:0}
@@ -1586,3 +1586,8 @@ body.noline #scrollline{display:none!important}
 .crefs .cnr{padding:.05rem .5rem;border:1px solid var(--line);border-radius:6px}
 .cmore{color:var(--muted);font-size:.76rem;align-self:center}
 .cgh{margin:.7rem 0 .2rem;padding:.15rem .35rem;color:var(--muted);font-size:.76rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid var(--line)}
+/* Found: the one compact filter on what a run did; the reason a decision gives, under its line in a card's trace (also Sources' Found) */
+.fbar .fdid{padding:.2rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font:.8rem var(--sans)}
+.tr .why{margin:.1rem 0 0;color:var(--muted);font-size:.8rem;line-height:1.4}
+.stab .fbar .fchips{margin:0}
+.stab .fbar{margin-top:.6rem}

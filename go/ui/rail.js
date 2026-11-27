@@ -33,8 +33,8 @@ function cfgFlowRows(c) {
   const head = c.models[c.flow === 'read' ? 'haiku' : c.flow] || '';
   return flowSteps(c).map(s => {
     const off = (s.on === false && !s.switch) || (s.switch && STEP_ON[s.key] && !c.on[STEP_ON[s.key]]);
-    const id = s.who === 'code' ? null : s.who === 'session' ? head : c.models[s.role];
-    return {key: sk(s), label: s.label, note: s.note || '', state: off ? 'skipped' : 'next', model: id && id !== head ? modelLabel(id) : ''};
+    const id = s.who === 'code' ? null : s.who === 'engine' ? GRADE_WORD[engineGrade(c)] : s.who === 'session' ? head : c.models[s.role];
+    return {key: sk(s), label: s.label, note: s.note || '', state: off ? 'skipped' : 'next', model: s.who === 'engine' ? id : id && id !== head ? modelLabel(id) : ''};
   });
 }
 function runFlowRows(v) {
@@ -42,7 +42,7 @@ function runFlowRows(v) {
   const cfg = v.config || [];
   const val = l => (cfg.find(c => c.label === l) || {}).value;
   const head = r.kind === 'pageflow' ? val('Reader') || '' : modelLabel(r.model);
-  const model = st => st.who === 'code' ? '' : st.who === 'session' ? head : st.who === 'haiku' ? val('Reader') || 'Haiku' : val('Hard pages') || 'Sonnet';
+  const model = st => st.who === 'code' ? '' : st.who === 'engine' ? modelLabel(r.model) : st.who === 'session' ? head : st.who === 'haiku' ? val('Reader') || 'Haiku' : val('Hard pages') || 'Sonnet';
   const live = r.status === 'running' || r.status === 'stopping' || r.status === 'starting';
   return ((v.flow && v.flow.steps) || []).filter(st => !(st.who === 'session' && !st.branch)).map(st => {
     let state = st.state, detail = st.detail || '';

@@ -38,3 +38,18 @@ func (s *Server) entitytrace(w http.ResponseWriter, r *http.Request) {
 	raw, err := s.call(r, 8*time.Second, args...)
 	passJSON(w, raw, err, http.StatusConflict)
 }
+
+// sourceview is what all the runs on one source did, as each run's own Found or Questions tab shows it (?source=SLUG&tab=found|questions).
+func (s *Server) sourceview(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	slug, tab := q.Get("source"), q.Get("tab")
+	if tab == "" {
+		tab = "found"
+	}
+	if !reSourceSlug.MatchString(slug) || (tab != "found" && tab != "questions") {
+		fail(w, http.StatusBadRequest, "a source name and a tab: found or questions")
+		return
+	}
+	raw, err := s.call(r, 2*time.Second, "sourceview", "--source", slug, "--tab", tab, "--json")
+	passJSON(w, raw, err, http.StatusConflict)
+}
